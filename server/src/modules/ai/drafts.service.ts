@@ -7,7 +7,6 @@
  * was a template because AI was down, or (c) the admin explicitly asks.
  */
 import type { AiDraft, TicketCategory } from "@prisma/client";
-import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { buildTicketContext } from "./context.js";
 import { classifyWithRules } from "./fallbackClassifier.js";
@@ -45,9 +44,10 @@ export async function getOrCreateDraft(ticketId: string, opts: DraftOptions = {}
 
   let draft: { reply: string; suggestedActions: string[] };
   let source: "AI" | "TEMPLATE" = "AI";
+  let model: string | null = null;
   let aiError: AiFailureReason | null = null;
   try {
-    draft = await callStructured({
+    ({ data: draft, model } = await callStructured({
       operation: "draft",
       ticketId,
       system: DRAFT_SYSTEM,
@@ -56,7 +56,7 @@ export async function getOrCreateDraft(ticketId: string, opts: DraftOptions = {}
       effort: "medium",
       maxTokens: 6000,
       timeoutMs: 45_000,
-    });
+    }));
   } catch (err) {
     if (!(err instanceof AiUnavailableError)) throw err;
     draft = templateDraft(category, ctx.authorFirstName);
@@ -68,7 +68,7 @@ export async function getOrCreateDraft(ticketId: string, opts: DraftOptions = {}
     source,
     body: draft.reply.trim(),
     suggestedActions: draft.suggestedActions.slice(0, 4),
-    model: source === "AI" ? env.ANTHROPIC_MODEL : null,
+    model,
     messageCount: ctx.messageCount,
   };
   const saved = await prisma.aiDraft.upsert({ where: { ticketId }, update: data, create: { ticketId, ...data } });

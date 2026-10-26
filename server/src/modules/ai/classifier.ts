@@ -11,7 +11,7 @@ import type { Classification } from "./fallbackClassifier.js";
  */
 export async function classifyTicketWithAi(ticketId: string): Promise<Classification> {
   const ctx = await buildTicketContext(ticketId);
-  return callStructured({
+  const { data } = await callStructured({
     operation: "classify",
     ticketId,
     system: CLASSIFY_SYSTEM,
@@ -21,4 +21,5 @@ export async function classifyTicketWithAi(ticketId: string): Promise<Classifica
     maxTokens: 2000,
     timeoutMs: 20_000,
   });
+  return data;
 }

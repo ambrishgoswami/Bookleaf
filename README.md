@@ -49,10 +49,11 @@ flowchart LR
     R[Routes + zod validation] --> S[Services: ownership + business rules]
     S --> T[Triage: AI → rules fallback]
     S --> D[Draft service: cached per ticket]
-    T & D --> L[LLM gateway: structured output, circuit breaker, usage log]
+    T & D --> L[LLM gateway: provider failover, circuit breakers, schema validation, usage log]
     S --> E[Event bus] --> SSE[/GET /events SSE/]
   end
-  L -->|HTTPS| C[(Anthropic API · Claude Haiku 5.5)]
+  L -->|primary| C[(Anthropic · Claude Haiku 5.5)]
+  L -.->|failover| G[(Google · Gemini 3.6 Flash)]
   S --> P[(PostgreSQL via Prisma)]
   A & B -->|REST + JWT| R
   SSE -->|ticket changed| A & B
@@ -71,7 +72,7 @@ server/
     modules/
       auth/  books/  tickets/  events/
       ai/            llm gateway, prompts, knowledge base, context builder, classifier, drafts, templates
-  tests/             vitest + supertest (58 tests)
+  tests/             vitest + supertest (66 tests)
 client/
   src/lib/           api client, auth context, SSE hook, formatting, types
   src/components/    UI primitives, app shell, message thread
@@ -96,8 +97,10 @@ client/
 
 ## AI integration
 
-### Model choice
-**Claude Haiku 5.5** (`claude-haiku-5-5`, configurable through `ANTHROPIC_MODEL`). Both jobs are narrow — classify into a fixed taxonomy, and write a ~150-word reply from supplied facts — so a small fast model is enough. It costs $0.10 / $0.50 per million input/output tokens, supports structured JSON output and prompt caching, and responds fast enough for an admin opening a ticket. If a larger model is ever needed for drafts, only the env var changes.
+### Model choice and provider failover
+- **Primary: Claude Haiku 5.5** (`claude-haiku-5-5`). Both jobs are narrow — classify into a fixed taxonomy, and write a ~150-word reply from supplied facts — so a small fast model is enough. It costs $0.10 / $0.50 per million input/output tokens, supports schema-enforced JSON output and explicit prompt caching, and is quick enough for an admin opening a ticket.
+- **Secondary: Gemini 3.6 Flash** (`gemini-3.6-flash`). If Claude is down, rate-limited or out of credits, the same request goes to Gemini before falling back to rules or templates. It was chosen by testing the real classification prompt: 3.6 Flash answered in ~3 s and applied the KB rubric correctly (CRITICAL for a never-paid author). Flash-Lite was slower in that test and under-rated the same ticket, and 2.5 Flash-Lite is no longer available to new keys. Gemini is ~15× Haiku's list price, so it is the backup, not the default.
+- **Configuration:** `AI_PROVIDERS="anthropic,gemini"` sets the order. Each provider is one small adapter ([`providers/`](server/src/modules/ai/providers)) behind a shared interface; the gateway owns failover, per-provider circuit breakers, schema validation and logging. Every call records which model answered, and so does each draft.
 
 ### 1. Classification (category + priority)
 - Runs in the background after a ticket is created.
@@ -131,15 +134,22 @@ All LLM traffic goes through one gateway ([`server/src/modules/ai/llm.ts`](serve
 | Situation | Behaviour |
 |---|---|
 | No API key | App runs normally; rules classify, templates draft. |
+| Primary provider fails (any reason) | The **next provider** answers (Claude → Gemini); both attempts are logged. |
 | 429 / 5xx / network | SDK retries with backoff (2×), then we fall back. |
 | Timeout | 20 s for classification, 45 s for drafts, then fallback. |
 | Refusal / truncated / schema mismatch | Treated as a failed answer; fallback (doesn't trip the breaker). |
-| Repeated failures | **Circuit breaker** opens for 60 s (5 min for auth errors), so an outage doesn't add a timeout to every request. |
+| Repeated failures | A **circuit breaker per provider** opens for 60 s (5 min for auth errors), so an outage doesn't add a timeout to every request — the next provider is tried directly. |
 | Fallback classification | Keyword rules mirroring the KB escalation rules; marked `Rules` in the UI. |
 | Fallback draft | A KB-based template for the category, pre-filled with the author's name, with `[brackets]` to complete. The UI says why ("AI is rate-limited right now"). |
 | Admin opinion | An admin override always wins, even over a classification that finishes later. |
 
-Tickets are **always** created, and admins can **always** reply manually. This path has been exercised for real: with the Anthropic account out of credits, every call failed with a 400; the breaker opened after three failures and all demo tickets were classified by the fallback.
+Tickets are **always** created, and admins can **always** reply manually.
+
+Every layer of this has been triggered by real failures during development:
+- The Anthropic account ran out of credits (HTTP 400), so Gemini answered.
+- Gemini's free tier then hit its per-minute and per-day quotas (HTTP 429). Its breaker opened, and tickets were classified by the rules.
+
+The application kept working throughout.
 
 ### 4. Cost management
 Approximate prompt sizes (≈4 characters per token):
@@ -149,7 +159,7 @@ Approximate prompt sizes (≈4 characters per token):
 | Classify | ~700 tokens | ~280 tokens | No KB policy text, low effort, small output |
 | Draft | ~1,380 tokens | ~890 tokens | Only 1 category's examples (sending all would add ~490 tokens) |
 
-- **Prompt caching** — the system prompts are byte-identical across tickets (no dates or IDs; a test enforces this), so after the first call they are read from cache at ~10% of the input price.
+- **Prompt caching** — the system prompts are byte-identical across tickets (no dates or IDs; a test enforces this). Claude reads them from cache at ~10% of the input price via an explicit breakpoint. Gemini caches repeated prefixes implicitly; in testing, the ~1k-token classify prompt was too short to hit its cache.
 - **Send less** — only the relevant category's examples; the linked book in detail, or one line per book for account-level tickets; at most the last 6 messages, each truncated; no internal history beyond the last 3 notes.
 - **Call less** — the draft is generated once and reused on every open; it is regenerated only when the conversation changes, after an outage, or on request. Classification runs once per ticket.
 - **Measure** — every call is logged in `AiCallLog` (tokens, cache reads/writes, latency, failure reason). `GET /api/v1/ai/usage` and the dashboard card show calls, cache hit ratio, failures and estimated cost.
@@ -158,7 +168,12 @@ Approximate prompt sizes (≈4 characters per token):
 ### 5. Evaluation
 `npm run ai:eval -- --drafts` (in `server/`) runs **12 cases** against the real model: the KB's sample queries plus harder ones — a legal threat, a below-threshold royalty, Hinglish, and a prompt-injection attempt. Each case is linked to a real seeded author so account facts are realistic. The script prints model vs expected vs rules-fallback, the drafts, and token usage, then deletes what it created.
 
-> **Status:** not yet run — the development API key had no credits. Results will be added here once it has been run.
+**Live results so far (Gemini 3.6 Flash; Claude had no credits).** The full run is pending because the free-tier quota was exhausted. On the first five cases:
+- **Classification: 4/5 correct.** Examples: royalty-amount question → MEDIUM; ISBN mismatch → HIGH, citing the policy that ISBN errors are always high; print defects → HIGH; "Currently Unavailable" → HIGH.
+- **Drafts read like a BookLeaf rep.** Each quoted the author's real pending amount, the threshold and the exact payout date (14 Nov 2026), owned the ISBN error with a 48-hour escalation, and suggested sensible internal actions.
+- **The miss led to a fix.** For an author whose last payout was a year ago, the model called the complaint "routine" because the current payout window was still open. Working out *which past payout was missed* is date arithmetic, so it now happens in code (`payoutLooksOverdue` in `domain/policy.ts`, unit-tested), and the account facts flag "possible missed payout" explicitly.
+
+To reproduce: `EVAL_DELAY_MS=13000 npm run ai:eval -- --drafts`. The delay keeps it under free-tier per-minute limits.
 
 ---
 
@@ -222,7 +237,7 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 | Command (in `server/`) | |
 |---|---|
-| `npm test` | 58 integration + unit tests (needs the seeded DB) |
+| `npm test` | 66 integration + unit tests (needs the seeded DB) |
 | `npm run ai:eval -- --drafts` | Live AI evaluation (needs `ANTHROPIC_API_KEY`) |
 | `npm run typecheck` | TypeScript |
 
@@ -233,8 +248,11 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 | `DATABASE_URL` | Postgres connection string |
 | `JWT_SECRET` | Long random string (`openssl rand -hex 32`) |
 | `JWT_EXPIRES_IN` | Default `12h` |
+| `AI_PROVIDERS` | Failover order, default `anthropic,gemini` |
 | `ANTHROPIC_API_KEY` | Optional. **Server-side only — never sent to the browser** (the client has no AI code or keys) |
 | `ANTHROPIC_MODEL` | Default `claude-haiku-5-5` |
+| `GEMINI_API_KEY` | Optional (alias `GOOGLE_API_KEY`). Server-side only |
+| `GEMINI_MODEL` | Default `gemini-3.6-flash` |
 | `CORS_ORIGIN` | Comma-separated allowed origins |
 | `PORT` | Default `4000` |
 
@@ -244,14 +262,14 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 ## Testing
 
-58 tests (Vitest + Supertest) against a real Postgres, covering:
+66 tests (Vitest + Supertest) against a real Postgres, covering:
 
 - **Auth:** valid/invalid login, the same message for unknown email and wrong password, malformed JSON, tampered token.
 - **RBAC:** authors can't see, list or widen their scope to other authors' books or tickets; admin-only endpoints.
 - **Ticket lifecycle:** first response, auto-assign, reopen on author reply, closed tickets, validation.
 - **Privacy:** internal notes never reach authors — over REST *or* SSE.
 - **Real-time delivery:** an author's SSE stream receives replies on their tickets and nothing from other authors.
-- **AI layer** (fake client, no network):
+- **AI layer** (fake Claude and Gemini clients, no network):
   - success path;
   - system prompt stays byte-stable, so caching works;
   - rate limit → rules fallback;
@@ -259,8 +277,9 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
   - breaker stops calls after repeated 5xx;
   - draft is cached and regenerated only when the conversation changes;
   - only the matching category's examples are sent;
-  - template fallback.
-- **Domain:** payout-date maths across quarter and year boundaries; fallback classifier on the KB samples.
+  - template fallback;
+  - **provider failover:** Claude out of credits → Gemini answers; an open circuit is skipped; Gemini safety blocks and 429s are mapped; schema-invalid output is rejected.
+- **Domain:** payout-date maths across quarter and year boundaries; missed-payout detection; fallback classifier on the KB samples.
 
 ---
 
@@ -275,5 +294,6 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
   - an eval set built from admin overrides and edited drafts;
   - tracking how much admins edit drafts before sending;
   - per-category prompt tuning.
+- **Free-tier AI quotas.** The Gemini free tier allows 5 requests/minute and 20/day per model, enough to demo failover but not real traffic. Production would use paid tiers (and Claude credits) for both.
 - **Bank-detail and per-platform sales data** aren't in the dataset, so drafts ask the author to confirm these instead of stating them.
 - **Search** uses `ILIKE`; at scale, Postgres full-text search or trigram indexes.

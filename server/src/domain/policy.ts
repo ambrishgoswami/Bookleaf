@@ -58,5 +58,30 @@ export function nextRoyaltyPayout(today: Date = new Date()) {
   return { quarter: `Q${q} ${periodEnd.getUTCFullYear()}`, quarterEnd: periodEnd, payoutBy };
 }
 
+/** The most recent payout deadline that has already passed as of `today`. */
+export function lastScheduledPayout(today: Date = new Date()) {
+  const upcoming = nextRoyaltyPayout(today);
+  const previousQuarterEnd = quarterEnd(addDays(upcoming.quarterEnd, -100));
+  return addDays(previousQuarterEnd, PAYOUT_WINDOW_DAYS);
+}
+
+/**
+ * Whether a book looks like it missed a scheduled payout: its pending royalty is
+ * above the threshold, yet its last payout (if any) predates the most recent
+ * payout deadline. This is a signal for the support team to check, not proof —
+ * some of the pending amount may have accrued after that deadline.
+ */
+export function payoutLooksOverdue(
+  book: { royaltyPending: number; lastRoyaltyPayoutDate: Date | null; publicationDate: Date | null },
+  today: Date = new Date(),
+) {
+  if (book.royaltyPending < PAYOUT_THRESHOLD_INR || !book.publicationDate) return false;
+  // The last payout window ran from that quarter's end to its deadline; a payout
+  // made anywhere inside it counts.
+  const windowOpened = addDays(lastScheduledPayout(today), -PAYOUT_WINDOW_DAYS);
+  if (book.publicationDate > windowOpened) return false; // too new to have been due
+  return !book.lastRoyaltyPayoutDate || book.lastRoyaltyPayoutDate < windowOpened;
+}
+
 /** Formats a DB date as YYYY-MM-DD (dates are calendar days, not instants). */
 export const toISODate = (date: Date | null | undefined) => (date ? date.toISOString().slice(0, 10) : null);

@@ -5,10 +5,16 @@ import { parse } from "../../lib/validation.js";
 import { requireRole } from "../../middleware/auth.js";
 import { aiStatus } from "./llm.js";
 import { getOrCreateDraft } from "./drafts.service.js";
+import type { Pricing } from "./providers/types.js";
 
-/** USD per million tokens. Cache reads ≈ 0.1× input, cache writes ≈ 1.25× input. */
-const PRICING: Record<string, { input: number; output: number }> = {
-  "claude-haiku-5-5": { input: 0.1, output: 0.5 },
+/**
+ * USD per million tokens, for the usage report's cost estimate. Cache reads and
+ * writes are multipliers of the input price. Unknown models report null cost.
+ * Gemini uses the post-promotional list price so estimates err high.
+ */
+const PRICING: Record<string, Pricing> = {
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.1, cacheWrite: 1.25 },
+  "gemini-3.6-flash": { input: 1.5, output: 7.5, cacheRead: 0.1, cacheWrite: 0 },
 };
 
 const DraftBody = z.object({
@@ -55,8 +61,8 @@ aiRouter.get("/usage", async (req, res) => {
     const price = PRICING[row.model];
     const costUsd = price
       ? ((t.inputTokens ?? 0) * price.input +
-          (t.cacheReadTokens ?? 0) * price.input * 0.1 +
-          (t.cacheWriteTokens ?? 0) * price.input * 1.25 +
+          (t.cacheReadTokens ?? 0) * price.input * price.cacheRead +
+          (t.cacheWriteTokens ?? 0) * price.input * price.cacheWrite +
           (t.outputTokens ?? 0) * price.output) /
         1_000_000
       : null;

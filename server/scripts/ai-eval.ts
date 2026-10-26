@@ -118,8 +118,12 @@ const CASES: Case[] = [
 
 const pad = (s: string, n: number) => (s.length >= n ? s.slice(0, n - 1) + "…" : s.padEnd(n));
 
+// Pause between model calls, e.g. EVAL_DELAY_MS=13000 to stay under a 5 requests/minute free tier.
+const DELAY_MS = Number(process.env.EVAL_DELAY_MS ?? 0);
+const pause = () => new Promise((r) => setTimeout(r, DELAY_MS));
+
 async function main() {
-  if (!aiEnabled()) throw new Error("ANTHROPIC_API_KEY is not set — nothing to evaluate.");
+  if (!aiEnabled()) throw new Error("No AI provider key is set — nothing to evaluate.");
   const withDrafts = process.argv.includes("--drafts");
   const created: string[] = [];
   const startedAt = new Date();
@@ -135,12 +139,21 @@ async function main() {
       });
       created.push(ticket.id);
 
-      const ai = await classifyTicketWithAi(ticket.id);
-      const rules = classifyWithRules(c.subject, c.description);
       const ok = (r: { category: TicketCategory; priority: TicketPriority }) =>
         c.expect.category.includes(r.category) && c.expect.priority.includes(r.priority);
-      if (ok(ai)) aiPass++;
+      const rules = classifyWithRules(c.subject, c.description);
       if (ok(rules)) rulesPass++;
+
+      let ai: Awaited<ReturnType<typeof classifyTicketWithAi>>;
+      try {
+        ai = await classifyTicketWithAi(ticket.id);
+      } catch (err) {
+        console.log(`FAIL  ${pad(c.name, 62)} AI unavailable (${err instanceof Error ? err.message : err}) · rules: ${rules.category}/${rules.priority}`);
+        await pause();
+        continue;
+      }
+      await pause();
+      if (ok(ai)) aiPass++;
 
       console.log(`${ok(ai) ? "PASS" : "FAIL"}  ${pad(c.name, 62)} AI: ${pad(`${ai.category}/${ai.priority}`, 36)} rules: ${rules.category}/${rules.priority}`);
       console.log(`      ↳ ${ai.reasoning}`);
@@ -148,7 +161,8 @@ async function main() {
       if (withDrafts && c.draft) {
         await prisma.ticket.update({ where: { id: ticket.id }, data: { category: ai.category, priority: ai.priority } });
         const draft = await getOrCreateDraft(ticket.id);
-        console.log(`\n----- DRAFT (${draft.source}) -----\n${draft.body}\n  actions: ${JSON.stringify(draft.suggestedActions)}\n`);
+        await pause();
+        console.log(`\n----- DRAFT (${draft.source}${draft.model ? ` · ${draft.model}` : ""}) -----\n${draft.body}\n  actions: ${JSON.stringify(draft.suggestedActions)}\n`);
       }
     }
 
@@ -156,14 +170,15 @@ async function main() {
     console.log(`Rules fallback:  ${rulesPass}/${CASES.length} correct`);
 
     const usage = await prisma.aiCallLog.groupBy({
-      by: ["operation"],
+      by: ["operation", "model", "success"],
       where: { createdAt: { gte: startedAt } },
       _count: true,
       _sum: { inputTokens: true, outputTokens: true, cacheReadTokens: true, cacheWriteTokens: true },
       _avg: { latencyMs: true },
     });
     console.log("\nUsage:");
-    for (const u of usage) console.log(`  ${u.operation}: ${u._count} calls, avg ${Math.round(u._avg.latencyMs ?? 0)}ms, tokens`, u._sum);
+    for (const u of usage)
+      console.log(`  ${u.operation} · ${u.model} · ${u.success ? "ok" : "failed"}: ${u._count} calls, avg ${Math.round(u._avg.latencyMs ?? 0)}ms, tokens`, u._sum);
   } finally {
     await prisma.ticket.deleteMany({ where: { id: { in: created } } });
     await prisma.$disconnect();

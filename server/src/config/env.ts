@@ -18,9 +18,14 @@ const EnvSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("12h"),
   // Comma-separated list of allowed browser origins.
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
-  // Optional: without a key, AI features degrade to rule-based fallbacks.
+  // AI providers, tried in this order. Each is optional: without any key, AI
+  // features degrade to rule-based classification and template drafts.
+  AI_PROVIDERS: z.string().default("anthropic,gemini"),
   ANTHROPIC_API_KEY: z.string().optional().transform((v) => v || undefined),
   ANTHROPIC_MODEL: z.string().default("claude-haiku-5-5"),
+  GEMINI_API_KEY: z.string().optional().transform((v) => v || undefined),
+  GOOGLE_API_KEY: z.string().optional().transform((v) => v || undefined), // accepted alias
+  GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -32,6 +37,8 @@ if (!parsed.success) {
 
 export const env = {
   ...parsed.data,
+  GEMINI_API_KEY: parsed.data.GEMINI_API_KEY ?? parsed.data.GOOGLE_API_KEY,
+  aiProviders: parsed.data.AI_PROVIDERS.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean),
   corsOrigins: parsed.data.CORS_ORIGIN.split(",").map((o) => o.trim()),
   isProduction: parsed.data.NODE_ENV === "production",
   isTest: parsed.data.NODE_ENV === "test",

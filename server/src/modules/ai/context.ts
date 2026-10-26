@@ -16,7 +16,9 @@ import { NotFound } from "../../lib/errors.js";
 import {
   PAYOUT_THRESHOLD_INR,
   PUBLISHED_STATUS,
+  lastScheduledPayout,
   nextRoyaltyPayout,
+  payoutLooksOverdue,
   productionStage,
   toISODate,
 } from "../../domain/policy.js";
@@ -28,12 +30,16 @@ const MAX_DESCRIPTION_CHARS = 3000;
 const inr = (n: number | null) => (n == null ? "not set" : `₹${n.toLocaleString("en-IN")}`);
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}… [truncated]` : text);
 
-function describeBook(b: Book, detailed: boolean): string {
+function describeBook(b: Book, detailed: boolean, today: Date): string {
   if (b.status !== PUBLISHED_STATUS) {
     const { stage, index, totalStages } = productionStage(b.status);
     return `- "${b.title}" (${b.code}, ISBN ${b.isbn}) — IN PRODUCTION, current stage: ${stage} (stage ${index + 1} of ${totalStages}). Not yet published, no sales or royalties yet.`;
   }
-  const line = `- "${b.title}" (${b.code}, ISBN ${b.isbn}) — Published & Live since ${toISODate(b.publicationDate)}; ${b.copiesSold} copies sold; royalty earned ${inr(b.royaltyEarned)}, paid ${inr(b.royaltyPaid)}, pending ${inr(b.royaltyPending)}; last payout ${toISODate(b.lastRoyaltyPayoutDate) ?? "never"}.`;
+  const line = `- "${b.title}" (${b.code}, ISBN ${b.isbn}) — Published & Live since ${toISODate(b.publicationDate)}; ${b.copiesSold} copies sold; royalty earned ${inr(b.royaltyEarned)}, paid ${inr(b.royaltyPaid)}, pending ${inr(b.royaltyPending)}; last payout ${toISODate(b.lastRoyaltyPayoutDate) ?? "never"}.${
+    payoutLooksOverdue(b, today)
+      ? ` ⚠ Possible missed payout: pending is above the threshold but the last payout predates the most recent payout cycle (due by ${toISODate(lastScheduledPayout(today))}). Treat as BookLeaf's responsibility to investigate.`
+      : ""
+  }`;
   if (!detailed) return line;
   return `${line}
   MRP ${inr(b.mrp)}, author royalty per copy ${inr(b.royaltyPerCopy)}, genre ${b.genre}, printed by ${b.printPartner ?? "n/a"}, available on: ${b.availableOn.join(", ") || "none"}.`;
@@ -70,8 +76,8 @@ export async function buildTicketContext(ticketId: string, today = new Date()): 
   const payout = nextRoyaltyPayout(today);
 
   const books = ticket.book
-    ? `Book this ticket is about:\n${describeBook(ticket.book, true)}`
-    : `Ticket is account-level (no specific book). All books:\n${author.books.map((b) => describeBook(b, false)).join("\n")}`;
+    ? `Book this ticket is about:\n${describeBook(ticket.book, true, today)}`
+    : `Ticket is account-level (no specific book). All books:\n${author.books.map((b) => describeBook(b, false, today)).join("\n")}`;
 
   const accountFacts = [
     `Author: ${author.user.name} (${author.code}), ${author.city ?? "city unknown"}, with BookLeaf since ${toISODate(author.joinedDate)}.`,

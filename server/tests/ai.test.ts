@@ -4,10 +4,13 @@
  * circuit breaker and draft caching. No network calls, no cost.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { ApiError, type GoogleGenAI } from "@google/genai";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../src/lib/prisma.js";
-import { aiStatus, setLlmClient } from "../src/modules/ai/llm.js";
+import { aiStatus, setProviders } from "../src/modules/ai/llm.js";
+import { createAnthropicProvider } from "../src/modules/ai/providers/anthropic.js";
+import { createGeminiProvider } from "../src/modules/ai/providers/gemini.js";
 import { classifyTicketWithAi } from "../src/modules/ai/classifier.js";
 import { getOrCreateDraft } from "../src/modules/ai/drafts.service.js";
 import { setAiClassifier, triageTicket } from "../src/modules/tickets/triage.js";
@@ -19,8 +22,8 @@ type ParseParams = {
   output_config: { effort: string };
 };
 
-/** A fake `messages.parse` that records calls and returns/throws whatever the test scripts. */
-function fakeClient(respond: (params: ParseParams, call: number) => unknown) {
+/** A fake Anthropic `messages.parse` that records calls and returns/throws whatever the test scripts. */
+function fakeAnthropic(respond: (params: ParseParams, call: number) => unknown) {
   const calls: ParseParams[] = [];
   const client = {
     messages: {
@@ -32,9 +35,38 @@ function fakeClient(respond: (params: ParseParams, call: number) => unknown) {
       },
     },
   };
-  setLlmClient(client as unknown as Anthropic);
+  return { calls, provider: createAnthropicProvider(client as unknown as Anthropic, "claude-haiku-5-5") };
+}
+
+/** Anthropic as the only provider — most tests exercise one provider. */
+function fakeClient(respond: (params: ParseParams, call: number) => unknown) {
+  const { calls, provider } = fakeAnthropic(respond);
+  setProviders([provider]);
   return calls;
 }
+
+/** A fake Gemini `models.generateContent`. */
+function fakeGemini(respond: () => unknown) {
+  let calls = 0;
+  const client = {
+    models: {
+      generateContent: async () => {
+        calls++;
+        const result = respond();
+        if (result instanceof Error) throw result;
+        return result;
+      },
+    },
+  };
+  return { calls: () => calls, provider: createGeminiProvider(client as unknown as GoogleGenAI, "gemini-3.6-flash") };
+}
+
+const geminiOk = (output: unknown) => ({
+  text: JSON.stringify(output),
+  candidates: [{ finishReason: "STOP" }],
+  usageMetadata: { promptTokenCount: 1000, cachedContentTokenCount: 600, candidatesTokenCount: 90, thoughtsTokenCount: 40 },
+});
+const outOfCredits = () => new Anthropic.BadRequestError(400, {}, "Your credit balance is too low", new Headers());
 
 const ok = (parsed_output: unknown) => ({
   stop_reason: "end_turn",
@@ -48,10 +80,15 @@ let authorToken: string;
 let adminToken: string;
 const created: string[] = [];
 
+/**
+ * Creates a ticket directly in the DB. (Going through POST /tickets would also
+ * start a background triage, racing the triage each test runs explicitly.)
+ */
 async function newTicket(subject = "Royalty not received", description = "I haven't received any royalty for 6 months for my book.") {
-  const res = await request(app).post("/api/v1/tickets").set("Authorization", `Bearer ${authorToken}`).send({ subject, description });
-  created.push(res.body.data.id);
-  return res.body.data.id as string;
+  const author = await prisma.author.findUniqueOrThrow({ where: { code: "AUTH001" } });
+  const ticket = await prisma.ticket.create({ data: { authorId: author.id, subject, description } });
+  created.push(ticket.id);
+  return ticket.id;
 }
 
 beforeAll(async () => {
@@ -59,7 +96,7 @@ beforeAll(async () => {
   [authorToken, adminToken] = await Promise.all([tokenFor(AUTHOR), tokenFor(ADMIN)]);
 });
 afterEach(() => {
-  setLlmClient(null);
+  setProviders([]);
   setAiClassifier(null);
 });
 afterAll(async () => {
@@ -120,7 +157,7 @@ describe("AI classification", () => {
     for (let i = 0; i < 5; i++) await triageTicket(await newTicket());
 
     expect(calls).toHaveLength(3); // 4th and 5th short-circuited
-    expect(aiStatus()).toMatchObject({ available: false, circuitOpenUntil: expect.any(String) });
+    expect(aiStatus()).toMatchObject({ available: false, providers: [{ name: "anthropic", circuitOpenUntil: expect.any(String) }] });
     const last = await prisma.ticket.findUniqueOrThrow({ where: { id: created.at(-1)! } });
     expect(last.categorySource).toBe("FALLBACK");
   });
@@ -173,7 +210,7 @@ describe("AI drafts", () => {
   });
 
   it("works with no API key configured", async () => {
-    setLlmClient(null);
+    setProviders([]);
     const res = await getOrCreateDraft(await newTicket());
     expect(res).toMatchObject({ source: "TEMPLATE", aiError: "not_configured" });
   });
@@ -190,5 +227,80 @@ describe("AI drafts", () => {
       .send({ guidance: "Keep it under 80 words" });
     expect(res.status).toBe(200);
     expect(calls[0]!.messages[0]!.content).toContain("<admin_instructions>\nKeep it under 80 words");
+  });
+});
+
+describe("provider failover (Anthropic → Gemini)", () => {
+  const classification = { category: "ROYALTY_PAYMENTS", priority: "CRITICAL", reasoning: "Never paid on a selling book." };
+
+  it("answers from Gemini when Claude is out of credits, and logs both attempts", async () => {
+    const claude = fakeAnthropic(() => outOfCredits());
+    const gemini = fakeGemini(() => geminiOk(classification));
+    setProviders([claude.provider, gemini.provider]);
+    setAiClassifier(classifyTicketWithAi);
+
+    const id = await newTicket();
+    await triageTicket(id);
+
+    const t = await prisma.ticket.findUniqueOrThrow({ where: { id } });
+    expect(t).toMatchObject({ category: "ROYALTY_PAYMENTS", priority: "CRITICAL", categorySource: "AI" });
+    const logs = await prisma.aiCallLog.findMany({ where: { ticketId: id }, orderBy: { createdAt: "asc" } });
+    expect(logs.map((l) => [l.model, l.success, l.errorType])).toEqual([
+      ["claude-haiku-5-5", false, "bad_request"],
+      ["gemini-3.6-flash", true, null],
+    ]);
+    // Gemini usage: prompt tokens split into uncached + cached; thinking counts as output.
+    expect(logs[1]).toMatchObject({ inputTokens: 400, cacheReadTokens: 600, outputTokens: 130 });
+  });
+
+  it("records which model wrote a draft", async () => {
+    const gemini = fakeGemini(() => geminiOk({ reply: "Hi Priya,\n\n…\n\nWarm regards,\nBookLeaf Author Support", suggestedActions: [] }));
+    setProviders([fakeAnthropic(() => serverError()).provider, gemini.provider]);
+    const draft = await getOrCreateDraft(await newTicket());
+    expect(draft).toMatchObject({ source: "AI", model: "gemini-3.6-flash" });
+  });
+
+  it("skips a provider whose circuit is open and goes straight to the next", async () => {
+    const claude = fakeAnthropic(() => serverError());
+    const gemini = fakeGemini(() => geminiOk(classification));
+    setProviders([claude.provider, gemini.provider]);
+    setAiClassifier(classifyTicketWithAi);
+
+    for (let i = 0; i < 5; i++) await triageTicket(await newTicket());
+    expect(claude.calls).toHaveLength(3); // breaker opened after 3 failures
+    expect(gemini.calls()).toBe(5);
+    expect(aiStatus()).toMatchObject({
+      available: true,
+      model: "gemini-3.6-flash",
+      providers: [
+        { name: "anthropic", available: false },
+        { name: "gemini", available: true },
+      ],
+    });
+  });
+
+  it("maps Gemini safety blocks and rate limits, then falls back to rules when every provider fails", async () => {
+    const blocked = fakeGemini(() => ({ text: "", candidates: [{ finishReason: "SAFETY" }] }));
+    setProviders([fakeAnthropic(() => rateLimited()).provider, blocked.provider]);
+    setAiClassifier(classifyTicketWithAi);
+    const id = await newTicket();
+    await triageTicket(id);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).categorySource).toBe("FALLBACK");
+    const logs = await prisma.aiCallLog.findMany({ where: { ticketId: id }, orderBy: { createdAt: "asc" } });
+    expect(logs.map((l) => l.errorType)).toEqual(["rate_limited", "refusal"]);
+
+    const quota = fakeGemini(() => new ApiError({ message: "quota exceeded", status: 429 }));
+    setProviders([quota.provider]);
+    const draft = await getOrCreateDraft(await newTicket());
+    expect(draft).toMatchObject({ source: "TEMPLATE", aiError: "rate_limited" });
+  });
+
+  it("rejects provider output that doesn't match the schema", async () => {
+    const gemini = fakeGemini(() => geminiOk({ category: "NOT_A_CATEGORY", priority: "HIGH", reasoning: "x" }));
+    setProviders([gemini.provider]);
+    setAiClassifier(classifyTicketWithAi);
+    const id = await newTicket();
+    await triageTicket(id);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id } })).categorySource).toBe("FALLBACK");
   });
 });

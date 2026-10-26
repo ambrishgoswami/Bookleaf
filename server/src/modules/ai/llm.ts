@@ -2,120 +2,104 @@
  * The single gateway for every LLM call in the app.
  *
  * Responsibilities:
- * - Structured output: responses are validated against a Zod schema by the SDK
- *   (`messages.parse` + `zodOutputFormat`), so callers get typed data or an error,
- *   never half-parsed JSON.
- * - Failure taxonomy: every failure becomes an `AiUnavailableError` with a reason
- *   (rate_limited, timeout, refusal, ...) so callers can fall back uniformly.
- * - Circuit breaker: after repeated failures we stop calling the provider for a
- *   cool-down period, so an outage doesn't add a timeout to every request.
+ * - Failover across providers in a configured order (AI_PROVIDERS, e.g.
+ *   "anthropic,gemini"): if the first is down, rate-limited or out of credits,
+ *   the next one answers. Only when all fail do callers fall back to rules/templates.
+ * - A circuit breaker per provider, so an outage doesn't add a timeout to
+ *   every request.
+ * - Schema validation of every response (Zod), whatever the provider.
  * - Observability: every call (success or failure) is logged to AiCallLog with
- *   token usage, cache hits and latency.
+ *   model, token usage, cache hits and latency.
  *
- * The API key is read from the environment on the server only.
+ * API keys are read from the environment on the server only.
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
+import { createDefaultAnthropicProvider } from "./providers/anthropic.js";
+import { createDefaultGeminiProvider } from "./providers/gemini.js";
+import { AiUnavailableError, type AiFailureReason, type LlmProvider, type LlmUsage } from "./providers/types.js";
 
-export type AiFailureReason =
-  | "not_configured"
-  | "circuit_open"
-  | "rate_limited"
-  | "timeout"
-  | "network"
-  | "auth"
-  | "provider_error"
-  | "bad_request"
-  | "refusal"
-  | "truncated"
-  | "invalid_output"
-  | "unknown";
+export { AiUnavailableError, type AiFailureReason } from "./providers/types.js";
 
-export class AiUnavailableError extends Error {
-  constructor(public readonly reason: AiFailureReason) {
-    super(`AI unavailable: ${reason}`);
-    this.name = "AiUnavailableError";
+// ---------------------------------------------------------------------------
+// Circuit breaker (one per provider)
+// ---------------------------------------------------------------------------
+
+class CircuitBreaker {
+  private consecutiveFailures = 0;
+  private openUntil = 0;
+  static readonly FAILURE_THRESHOLD = 3;
+  static readonly COOLDOWN_MS = 60_000;
+  static readonly AUTH_COOLDOWN_MS = 5 * 60_000; // a bad key won't fix itself in a minute
+
+  isOpen() {
+    return Date.now() < this.openUntil;
+  }
+  openUntilIso() {
+    return this.isOpen() ? new Date(this.openUntil).toISOString() : null;
+  }
+  success() {
+    this.consecutiveFailures = 0;
+    this.openUntil = 0;
+  }
+  /** Returns true if this failure opened the circuit. */
+  failure(reason: AiFailureReason) {
+    // Content-level failures (refusal, bad output) don't indicate an outage.
+    if (reason === "refusal" || reason === "invalid_output" || reason === "truncated") return false;
+    const wasOpen = this.isOpen();
+    this.consecutiveFailures += 1;
+    if (reason === "auth") this.openUntil = Date.now() + CircuitBreaker.AUTH_COOLDOWN_MS;
+    else if (this.consecutiveFailures >= CircuitBreaker.FAILURE_THRESHOLD) this.openUntil = Date.now() + CircuitBreaker.COOLDOWN_MS;
+    return !wasOpen && this.isOpen();
   }
 }
 
 // ---------------------------------------------------------------------------
-// Client
+// Provider chain
 // ---------------------------------------------------------------------------
 
-type LlmClient = Pick<Anthropic, "messages">;
-
-let client: LlmClient | null = env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 2 }) // SDK retries 429/5xx with backoff
-  : null;
-
-export const aiEnabled = () => client !== null;
-
-/** Test hook: inject a fake client (or null to simulate "no API key"). */
-export function setLlmClient(next: LlmClient | null) {
-  client = next;
-  breaker.reset();
+interface ChainEntry {
+  provider: LlmProvider;
+  breaker: CircuitBreaker;
 }
 
-// ---------------------------------------------------------------------------
-// Circuit breaker
-// ---------------------------------------------------------------------------
+function providersFromEnv(): LlmProvider[] {
+  const factories: Record<string, () => LlmProvider | null> = {
+    anthropic: () => (env.ANTHROPIC_API_KEY ? createDefaultAnthropicProvider(env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL) : null),
+    gemini: () => (env.GEMINI_API_KEY ? createDefaultGeminiProvider(env.GEMINI_API_KEY, env.GEMINI_MODEL) : null),
+  };
+  return env.aiProviders.map((name) => factories[name]?.() ?? null).filter((p): p is LlmProvider => p !== null);
+}
 
-const breaker = {
-  consecutiveFailures: 0,
-  openUntil: 0,
-  FAILURE_THRESHOLD: 3,
-  COOLDOWN_MS: 60_000,
-  AUTH_COOLDOWN_MS: 5 * 60_000, // a bad key won't fix itself in a minute
+let chain: ChainEntry[] = [];
+export function setProviders(providers: LlmProvider[]) {
+  chain = providers.map((provider) => ({ provider, breaker: new CircuitBreaker() }));
+}
+setProviders(providersFromEnv());
 
-  isOpen() {
-    return Date.now() < this.openUntil;
-  },
-  success() {
-    this.consecutiveFailures = 0;
-    this.openUntil = 0;
-  },
-  failure(reason: AiFailureReason) {
-    // Content-level failures (refusal, bad output) don't indicate an outage.
-    if (reason === "refusal" || reason === "invalid_output" || reason === "truncated") return;
-    this.consecutiveFailures += 1;
-    if (reason === "auth") this.openUntil = Date.now() + this.AUTH_COOLDOWN_MS;
-    else if (this.consecutiveFailures >= this.FAILURE_THRESHOLD) this.openUntil = Date.now() + this.COOLDOWN_MS;
-    if (this.isOpen()) logger.warn({ reason, until: new Date(this.openUntil) }, "AI circuit breaker opened");
-  },
-  reset() {
-    this.consecutiveFailures = 0;
-    this.openUntil = 0;
-  },
-};
+export const aiEnabled = () => chain.length > 0;
 
 export function aiStatus() {
+  const providers = chain.map(({ provider, breaker }) => ({
+    name: provider.name,
+    model: provider.model,
+    available: !breaker.isOpen(),
+    circuitOpenUntil: breaker.openUntilIso(),
+  }));
+  const active = providers.find((p) => p.available);
   return {
-    configured: client !== null,
-    model: env.ANTHROPIC_MODEL,
-    available: client !== null && !breaker.isOpen(),
-    circuitOpenUntil: breaker.isOpen() ? new Date(breaker.openUntil).toISOString() : null,
+    configured: chain.length > 0,
+    available: Boolean(active),
+    /** The model that will answer the next call. */
+    model: active?.model ?? providers[0]?.model ?? null,
+    providers,
   };
 }
 
-/** Maps SDK exceptions to a reason. Most specific classes first (subclasses before parents). */
-function failureReason(err: unknown): AiFailureReason {
-  if (err instanceof AiUnavailableError) return err.reason;
-  if (err instanceof Anthropic.APIConnectionTimeoutError) return "timeout";
-  if (err instanceof Anthropic.APIConnectionError) return "network";
-  if (err instanceof Anthropic.RateLimitError) return "rate_limited";
-  if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) return "auth";
-  if (err instanceof Anthropic.BadRequestError) return "bad_request";
-  if (err instanceof Anthropic.InternalServerError) return "provider_error";
-  if (err instanceof Anthropic.APIError) return (err.status ?? 0) >= 500 ? "provider_error" : "bad_request";
-  return "unknown";
-}
-
 // ---------------------------------------------------------------------------
-// Structured call
+// Structured call with failover
 // ---------------------------------------------------------------------------
 
 export interface StructuredCall<S extends z.ZodType> {
@@ -131,53 +115,48 @@ export interface StructuredCall<S extends z.ZodType> {
   timeoutMs: number;
 }
 
-export async function callStructured<S extends z.ZodType>(call: StructuredCall<S>): Promise<z.infer<S>> {
-  if (!client) throw new AiUnavailableError("not_configured");
-  if (breaker.isOpen()) throw new AiUnavailableError("circuit_open");
+export interface StructuredResult<T> {
+  data: T;
+  provider: LlmProvider["name"];
+  model: string;
+}
 
-  const started = Date.now();
-  let usage: Anthropic.Usage | undefined;
+export async function callStructured<S extends z.ZodType>(call: StructuredCall<S>): Promise<StructuredResult<z.infer<S>>> {
+  if (chain.length === 0) throw new AiUnavailableError("not_configured");
 
-  try {
-    const response = await client.messages.parse(
-      {
-        model: env.ANTHROPIC_MODEL,
-        max_tokens: call.maxTokens,
-        // Cache breakpoint on the system prompt: the KB + instructions are
-        // identical across tickets, so after the first call they're read from
-        // cache at a fraction of the input price.
-        system: [{ type: "text", text: call.system, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: call.user }],
-        output_config: { effort: call.effort, format: zodOutputFormat(call.schema) },
-      },
-      { timeout: call.timeoutMs },
-    );
-    usage = response.usage;
+  let lastReason: AiFailureReason = "circuit_open";
+  for (const { provider, breaker } of chain) {
+    if (breaker.isOpen()) continue;
 
-    if (response.stop_reason === "refusal") throw new AiUnavailableError("refusal");
-    if (response.stop_reason === "max_tokens") throw new AiUnavailableError("truncated");
-    if (response.parsed_output == null) throw new AiUnavailableError("invalid_output");
+    const started = Date.now();
+    let usage: LlmUsage | undefined;
+    try {
+      const result = await provider.generate(call);
+      usage = result.usage;
+      const parsed = call.schema.safeParse(result.output);
+      if (!parsed.success) throw new AiUnavailableError("invalid_output");
 
-    breaker.success();
-    await logCall(call, true, null, usage, started);
-    return response.parsed_output as z.infer<S>;
-  } catch (err) {
-    const reason = failureReason(err);
-    breaker.failure(reason);
-    logger.warn(
-      { reason, operation: call.operation, ticketId: call.ticketId, detail: err instanceof Error ? err.message : String(err) },
-      "LLM call failed",
-    );
-    await logCall(call, false, reason, usage, started);
-    throw err instanceof AiUnavailableError ? err : new AiUnavailableError(reason);
+      breaker.success();
+      await logCall(call, provider, true, null, usage, started);
+      return { data: parsed.data, provider: provider.name, model: provider.model };
+    } catch (err) {
+      const reason: AiFailureReason = err instanceof AiUnavailableError ? err.reason : "unknown";
+      lastReason = reason;
+      if (breaker.failure(reason)) logger.warn({ provider: provider.name }, "AI circuit breaker opened");
+      const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : err instanceof Error ? err.message : String(err);
+      logger.warn({ provider: provider.name, model: provider.model, reason, operation: call.operation, ticketId: call.ticketId, detail: cause }, "LLM call failed");
+      await logCall(call, provider, false, reason, usage, started);
+    }
   }
+  throw new AiUnavailableError(lastReason);
 }
 
 async function logCall(
   call: StructuredCall<z.ZodType>,
+  provider: LlmProvider,
   success: boolean,
   errorType: string | null,
-  usage: Anthropic.Usage | undefined,
+  usage: LlmUsage | undefined,
   started: number,
 ) {
   try {
@@ -185,13 +164,13 @@ async function logCall(
       data: {
         ticketId: call.ticketId ?? null,
         operation: call.operation,
-        model: env.ANTHROPIC_MODEL,
+        model: provider.model,
         success,
         errorType,
-        inputTokens: usage?.input_tokens ?? 0,
-        outputTokens: usage?.output_tokens ?? 0,
-        cacheReadTokens: usage?.cache_read_input_tokens ?? 0,
-        cacheWriteTokens: usage?.cache_creation_input_tokens ?? 0,
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        cacheReadTokens: usage?.cacheReadTokens ?? 0,
+        cacheWriteTokens: usage?.cacheWriteTokens ?? 0,
         latencyMs: Date.now() - started,
       },
     });
