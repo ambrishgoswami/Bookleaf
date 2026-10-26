@@ -54,7 +54,7 @@ export async function createTicket(user: AuthUser, input: CreateTicketInput) {
 // ---------------------------------------------------------------------------
 
 /** Loads a ticket the caller may see, or 404s (never reveals others' tickets). */
-async function findAccessibleTicket(user: AuthUser, ticketId: string) {
+export async function findAccessibleTicket(user: AuthUser, ticketId: string) {
   const ticket = await prisma.ticket.findUnique({ where: { id: ticketId }, include: adminTicketInclude });
   if (!ticket || (!isAdmin(user) && ticket.authorId !== user.authorId)) throw NotFound("Ticket");
   return ticket;
@@ -260,6 +260,23 @@ export async function updateTicket(admin: AuthUser, ticketId: string, input: Upd
   const authorVisible = Boolean(data.status || data.assignee || data.category);
   publish({ type: "ticket.updated", ticketId, authorId: ticket.authorId, internal: !authorVisible });
   return toAdminTicket(updated);
+}
+
+/** The author confirms their issue is solved. Reopens automatically if they reply later. */
+export async function resolveByAuthor(user: AuthUser, ticketId: string) {
+  const ticket = await findAccessibleTicket(user, ticketId);
+  if (ticket.status === "RESOLVED" || ticket.status === "CLOSED") throw Conflict("This ticket is already resolved");
+
+  const updated = await prisma.ticket.update({
+    where: { id: ticketId },
+    data: {
+      ...statusSideEffects(ticket.status, "RESOLVED"),
+      activities: { create: { actorId: user.id, action: "resolved_by_author", fromValue: ticket.status, toValue: "RESOLVED" } },
+    },
+    include: ticketInclude,
+  });
+  publish({ type: "ticket.updated", ticketId, authorId: ticket.authorId, internal: false });
+  return toAuthorTicket(updated);
 }
 
 export async function listAdmins() {

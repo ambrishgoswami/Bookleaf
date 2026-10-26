@@ -15,6 +15,11 @@ export const ticketInclude = {
   author: { select: { id: true, code: true, user: { select: { name: true, email: true } } } },
   assignee: userBrief,
   messages: { orderBy: { createdAt: "asc" }, include: { sender: userBrief } },
+  // File metadata only — the bytes are served by the download endpoint.
+  attachments: {
+    orderBy: { createdAt: "asc" },
+    select: { id: true, filename: true, mimeType: true, sizeBytes: true, createdAt: true, uploadedBy: userBrief },
+  },
 } satisfies Prisma.TicketInclude;
 
 export const adminTicketInclude = {
@@ -49,6 +54,7 @@ function baseFields(t: TicketWithRelations) {
     subject: t.subject,
     description: t.description,
     attachmentName: t.attachmentName,
+    attachments: t.attachments.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() })),
     status: t.status,
     category: t.category,
     categoryLabel: t.category ? CATEGORY_LABELS[t.category] : null,

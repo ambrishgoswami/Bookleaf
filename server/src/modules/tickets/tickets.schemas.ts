@@ -51,6 +51,9 @@ export const UpdateTicketBody = z
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), { message: "Provide at least one field to update" });
 
+/** Authors may only mark their own ticket as resolved. */
+export const AuthorUpdateTicketBody = z.object({ status: z.literal("RESOLVED", "Authors can only mark a ticket as resolved") }).strict();
+
 export const CreateMessageBody = z.object({
   body: trimmed(1, 10000, "Message"),
   /** INTERNAL_NOTE is admin-only (enforced in the service). */

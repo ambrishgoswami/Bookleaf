@@ -30,3 +30,41 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
 authRouter.get("/me", authenticate, async (req, res) => {
   res.json({ user: await authService.getProfile(currentUser(req).id) });
 });
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullish()
+    .transform((v) => (v ? v : null));
+
+const UpdateProfileBody = z
+  .object({
+    name: z.string().trim().min(2, "Name must be at least 2 characters").max(100).optional(),
+    phone: optionalText(30).optional(),
+    city: optionalText(80).optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), { message: "Provide at least one field to update" });
+
+authRouter.patch("/me", authenticate, async (req, res) => {
+  res.json({ user: await authService.updateProfile(currentUser(req), parse(UpdateProfileBody, req.body)) });
+});
+
+export const PasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(200)
+  .regex(/[A-Za-z]/, "Password must contain a letter")
+  .regex(/\d/, "Password must contain a number");
+
+const ChangePasswordBody = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: PasswordSchema,
+});
+
+authRouter.post("/change-password", authenticate, loginLimiter, async (req, res) => {
+  const { currentPassword, newPassword } = parse(ChangePasswordBody, req.body);
+  await authService.changePassword(currentUser(req).id, currentPassword, newPassword);
+  res.status(204).end();
+});

@@ -9,6 +9,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { Role } from "@prisma/client";
 import { Forbidden, Unauthorized } from "../lib/errors.js";
+import { prisma } from "../lib/prisma.js";
 import { verifyToken, type AuthUser } from "../modules/auth/auth.tokens.js";
 
 declare global {
@@ -20,10 +21,20 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, _res: Response, next: NextFunction) {
+/**
+ * Verifies the JWT, then confirms the account still exists and is active (one
+ * primary-key lookup). This makes deactivation and role changes take effect
+ * immediately instead of when the token expires.
+ */
+export async function authenticate(req: Request, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) throw Unauthorized();
-  req.user = verifyToken(header.slice("Bearer ".length));
+  const identity = verifyToken(header.slice("Bearer ".length));
+
+  const account = await prisma.user.findUnique({ where: { id: identity.id }, select: { isActive: true, role: true } });
+  if (!account?.isActive) throw Unauthorized("This account is no longer active");
+
+  req.user = { ...identity, role: account.role };
   next();
 }
 

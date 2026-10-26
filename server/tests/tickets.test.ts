@@ -181,9 +181,17 @@ describe("ticket lifecycle", () => {
     expect(res.status).toBe(409);
   });
 
-  it("authors cannot update ticket fields", async () => {
-    const res = await request(app).patch(`/api/v1/tickets/${ticketId}`).set(as(authorToken)).send({ status: "RESOLVED" });
-    expect(res.status).toBe(403);
+  it("authors can only mark a ticket resolved — not change other fields", async () => {
+    const priority = await request(app).patch(`/api/v1/tickets/${ticketId}`).set(as(authorToken)).send({ priority: "LOW" });
+    expect(priority.status).toBe(422);
+    const closed = await request(app).patch(`/api/v1/tickets/${ticketId}`).set(as(authorToken)).send({ status: "RESOLVED" });
+    expect(closed.status).toBe(409); // already closed above
+
+    const fresh = (await createTicket()).body.data.id;
+    const resolved = await request(app).patch(`/api/v1/tickets/${fresh}`).set(as(authorToken)).send({ status: "RESOLVED" });
+    expect(resolved.status).toBe(200);
+    expect(resolved.body.data.status).toBe("RESOLVED");
+    expect(resolved.body.data.priority).toBeUndefined(); // still the author projection
   });
 
   it("rejects an empty update", async () => {

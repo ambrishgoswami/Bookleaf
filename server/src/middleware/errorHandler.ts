@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
+import multer from "multer";
 import { AppError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 
@@ -19,6 +20,12 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
 
   // Malformed JSON body (thrown by express.json()).
   if (err instanceof SyntaxError && "body" in err) return send(400, "INVALID_JSON", "Request body is not valid JSON");
+
+  // Upload problems (thrown by multer).
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") return send(413, "FILE_TOO_LARGE", "Files must be 5 MB or smaller");
+    return send(422, "VALIDATION_FAILED", "Upload one file in the 'file' field", [{ field: "file", message: err.message }]);
+  }
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2025") return send(404, "NOT_FOUND", "Resource not found");

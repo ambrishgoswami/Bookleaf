@@ -2,7 +2,14 @@ import { Router } from "express";
 import { parse } from "../../lib/validation.js";
 import { currentUser, requireRole } from "../../middleware/auth.js";
 import * as tickets from "./tickets.service.js";
-import { CreateMessageBody, CreateTicketBody, IdParams, ListTicketsQuery, UpdateTicketBody } from "./tickets.schemas.js";
+import {
+  AuthorUpdateTicketBody,
+  CreateMessageBody,
+  CreateTicketBody,
+  IdParams,
+  ListTicketsQuery,
+  UpdateTicketBody,
+} from "./tickets.schemas.js";
 
 export const ticketsRouter = Router();
 
@@ -25,9 +32,16 @@ ticketsRouter.get("/:id", async (req, res) => {
   res.json({ data: await tickets.getTicket(currentUser(req), id) });
 });
 
-ticketsRouter.patch("/:id", requireRole("ADMIN"), async (req, res) => {
+// Admins can change any field; authors can only mark their own ticket resolved.
+ticketsRouter.patch("/:id", async (req, res) => {
   const { id } = parse(IdParams, req.params);
-  res.json({ data: await tickets.updateTicket(currentUser(req), id, parse(UpdateTicketBody, req.body)) });
+  const user = currentUser(req);
+  if (user.role === "AUTHOR") {
+    parse(AuthorUpdateTicketBody, req.body);
+    res.json({ data: await tickets.resolveByAuthor(user, id) });
+    return;
+  }
+  res.json({ data: await tickets.updateTicket(user, id, parse(UpdateTicketBody, req.body)) });
 });
 
 ticketsRouter.post("/:id/messages", async (req, res) => {
