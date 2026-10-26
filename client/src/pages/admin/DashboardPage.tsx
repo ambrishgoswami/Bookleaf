@@ -19,7 +19,7 @@ const PRIORITY_BAR: Record<TicketPriority, string> = {
   CRITICAL: "bg-red-600",
   HIGH: "bg-orange-400",
   MEDIUM: "bg-sky-400",
-  LOW: "bg-slate-300",
+  LOW: "bg-muted-foreground/30",
 };
 
 export function DashboardPage() {
@@ -35,10 +35,10 @@ export function DashboardPage() {
   const s = stats.data.data;
 
   const tiles = [
-    { label: "Active tickets", value: s.active.total, icon: Inbox, to: "/admin/tickets", tone: "text-slate-900" },
-    { label: "Overdue first response", value: s.active.overdue, icon: Clock, to: "/admin/tickets?overdue=1", tone: s.active.overdue ? "text-red-600" : "text-slate-900" },
-    { label: "Unassigned", value: s.active.unassigned, icon: UserX, to: "/admin/tickets?assignee=unassigned", tone: "text-slate-900" },
-    { label: "Assigned to me", value: s.active.assignedToMe, icon: UserCheck, to: "/admin/tickets?assignee=me", tone: "text-slate-900" },
+    { label: "Active tickets", value: s.active.total, icon: Inbox, to: "/admin/tickets", tone: "text-foreground" },
+    { label: "Overdue first response", value: s.active.overdue, icon: Clock, to: "/admin/tickets?overdue=1", tone: s.active.overdue ? "text-red-600" : "text-foreground" },
+    { label: "Unassigned", value: s.active.unassigned, icon: UserX, to: "/admin/tickets?assignee=unassigned", tone: "text-foreground" },
+    { label: "Assigned to me", value: s.active.assignedToMe, icon: UserCheck, to: "/admin/tickets?assignee=me", tone: "text-foreground" },
   ];
 
   return (
@@ -50,7 +50,7 @@ export function DashboardPage() {
         {tiles.map(({ label, value, icon: Icon, to, tone }) => (
           <Link key={label} to={to}>
             <Card className="p-5 transition-shadow hover:shadow-md">
-              <div className="flex items-center justify-between text-slate-500">
+              <div className="flex items-center justify-between text-muted-foreground">
                 <span className="text-sm">{label}</span>
                 <Icon className="size-4" aria-hidden />
               </div>
@@ -63,8 +63,8 @@ export function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900">Needs attention</h2>
-            <Link to="/admin/tickets" className="text-sm text-brand-700 hover:underline">
+            <h2 className="font-semibold text-foreground">Needs attention</h2>
+            <Link to="/admin/tickets" className="text-sm text-primary hover:underline">
               Open queue →
             </Link>
           </div>
@@ -75,14 +75,14 @@ export function DashboardPage() {
           ) : urgent.data.data.length === 0 ? (
             <EmptyState title="Queue is clear" body="No open tickets right now." />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-border/60">
               {urgent.data.data.map((t) => (
                 <li key={t.id}>
-                  <Link to={`/admin/tickets/${t.id}`} className="flex items-center gap-3 py-3 hover:bg-slate-50">
+                  <Link to={`/admin/tickets/${t.id}`} className="flex items-center gap-3 py-3 hover:bg-muted/60">
                     <PriorityBadge priority={t.priority} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-900">{t.subject}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="truncate text-sm font-medium text-foreground">{t.subject}</p>
+                      <p className="text-xs text-muted-foreground">
                         {t.reference} · {t.author.name} · {timeAgo(t.createdAt)}
                       </p>
                     </div>
@@ -101,7 +101,7 @@ export function DashboardPage() {
 
         <div className="space-y-6">
           <Card className="p-5">
-            <h2 className="mb-4 font-semibold text-slate-900">Active by priority</h2>
+            <h2 className="mb-4 font-semibold text-foreground">Active by priority</h2>
             <ul className="space-y-2.5">
               {PRIORITIES.map((p) => {
                 const count = s.active.byPriority[p] ?? 0;
@@ -110,10 +110,10 @@ export function DashboardPage() {
                   <li key={p}>
                     <Link to={`/admin/tickets?priority=${p}`} className="block">
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">{p[0] + p.slice(1).toLowerCase()}</span>
+                        <span className="text-muted-foreground">{p[0] + p.slice(1).toLowerCase()}</span>
                         <span className="font-medium">{count}</span>
                       </div>
-                      <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                      <div className="mt-1 h-1.5 rounded-full bg-muted">
                         <div className={cx("h-full rounded-full", PRIORITY_BAR[p])} style={{ width: `${pct}%` }} />
                       </div>
                     </Link>
@@ -142,7 +142,7 @@ function AiUsageCard() {
   return (
     <Card className="p-5">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+        <h2 className="flex items-center gap-2 font-semibold text-foreground">
           <Bot className="size-4 text-violet-600" aria-hidden /> AI assistant
         </h2>
         <span className={cx("text-xs font-medium", status.data?.data.available ? "text-emerald-600" : "text-amber-600")}>
@@ -151,25 +151,25 @@ function AiUsageCard() {
       </div>
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <dt className="text-slate-500">Calls (30d)</dt>
+          <dt className="text-muted-foreground">Calls (30d)</dt>
           <dd className="font-medium">{totalCalls}</dd>
         </div>
         <div>
-          <dt className="text-slate-500">Est. cost</dt>
+          <dt className="text-muted-foreground">Est. cost</dt>
           <dd className="font-medium">${cost.toFixed(4)}</dd>
         </div>
         <div>
-          <dt className="text-slate-500">Failed calls</dt>
+          <dt className="text-muted-foreground">Failed calls</dt>
           <dd className="font-medium">{failures}</dd>
         </div>
         <div>
-          <dt className="text-slate-500">Admin overrides</dt>
+          <dt className="text-muted-foreground">Admin overrides</dt>
           <dd className="font-medium">
             {sources.ADMIN ?? 0}/{classified}
           </dd>
         </div>
       </dl>
-      <p className="mt-3 text-xs text-slate-500">Model: {status.data?.data.model ?? "—"}</p>
+      <p className="mt-3 text-xs text-muted-foreground">Model: {status.data?.data.model ?? "—"}</p>
     </Card>
   );
 }

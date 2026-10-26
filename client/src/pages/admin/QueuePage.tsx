@@ -62,7 +62,7 @@ export function QueuePage() {
       <Card className="mb-4 p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <div className="relative lg:col-span-2">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground/70" aria-hidden />
             <Input
               aria-label="Search"
               placeholder="Search subject, author or BL-1001…"
@@ -110,17 +110,17 @@ export function QueuePage() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-          <label className="flex items-center gap-2 text-slate-600">
+          <label className="flex items-center gap-2 text-muted-foreground">
             From <Input type="date" className="w-auto py-1" value={filters.from} onChange={(e) => update({ from: e.target.value || null })} />
           </label>
-          <label className="flex items-center gap-2 text-slate-600">
+          <label className="flex items-center gap-2 text-muted-foreground">
             To <Input type="date" className="w-auto py-1" value={filters.to} onChange={(e) => update({ to: e.target.value || null })} />
           </label>
-          <label className="flex items-center gap-2 text-slate-600">
+          <label className="flex items-center gap-2 text-muted-foreground">
             <input type="checkbox" className="size-4 accent-red-600" checked={filters.overdue} onChange={(e) => update({ overdue: e.target.checked ? "1" : null })} />
             Overdue only
           </label>
-          <label className="ml-auto flex items-center gap-2 text-slate-600">
+          <label className="ml-auto flex items-center gap-2 text-muted-foreground">
             Sort
             <Select className="w-auto py-1" value={filters.sort} onChange={(e) => update({ sort: e.target.value === "urgency" ? null : e.target.value })}>
               <option value="urgency">Most urgent</option>
@@ -146,7 +146,7 @@ export function QueuePage() {
       ) : (
         <Card className={cx("overflow-hidden", list.isPlaceholderData && "opacity-60")}>
           {/* Phones: one card per ticket */}
-          <ul className="divide-y divide-slate-100 md:hidden">
+          <ul className="divide-y divide-border/60 md:hidden">
             {list.data.data.map((t) => (
               <li key={t.id}>
                 <Link to={`/admin/tickets/${t.id}`} className={cx("block px-4 py-3", t.sla.overdue && "bg-red-50/60")}>
@@ -158,13 +158,13 @@ export function QueuePage() {
                         <AlertCircle className="size-3" aria-hidden /> Overdue
                       </span>
                     )}
-                    <span className="ml-auto text-xs text-slate-500">{timeAgo(t.createdAt)}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{timeAgo(t.createdAt)}</span>
                   </div>
-                  <p className="mt-1.5 font-medium text-slate-900">{t.subject}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-1.5 font-medium text-foreground">{t.subject}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {t.reference} · {t.author.name} · {t.categoryLabel ?? "Classifying…"}
                   </p>
-                  <p className="mt-0.5 text-xs text-slate-500">{t.assignee ? `Assigned to ${t.assignee.name}` : "Unassigned"}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t.assignee ? `Assigned to ${t.assignee.name}` : "Unassigned"}</p>
                 </Link>
               </li>
             ))}
@@ -172,7 +172,7 @@ export function QueuePage() {
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-medium tracking-wide text-slate-500 uppercase">
+              <thead className="bg-muted/60 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 <tr>
                   <th className="px-4 py-3">Priority</th>
                   <th className="px-4 py-3">Ticket</th>
@@ -182,12 +182,12 @@ export function QueuePage() {
                   <th className="px-4 py-3">Age</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border/60">
                 {list.data.data.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => navigate(`/admin/tickets/${t.id}`)}
-                    className={cx("cursor-pointer hover:bg-slate-50", t.sla.overdue && "bg-red-50/60")}
+                    className={cx("cursor-pointer hover:bg-muted/60", t.sla.overdue && "bg-red-50/60")}
                   >
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-col items-start gap-1">
@@ -196,23 +196,23 @@ export function QueuePage() {
                       </div>
                     </td>
                     <td className="max-w-md px-4 py-3 align-top">
-                      <Link to={`/admin/tickets/${t.id}`} className="font-medium text-slate-900 hover:text-brand-700" onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/admin/tickets/${t.id}`} className="font-medium text-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
                         {t.subject}
                       </Link>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         {t.reference} · {t.author.name} · {t.book?.title ?? "Account-level"}
                       </p>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <p className="text-slate-700">{t.categoryLabel ?? "—"}</p>
+                      <p className="text-foreground/90">{t.categoryLabel ?? "—"}</p>
                       <SourceTag source={t.categorySource} />
                     </td>
                     <td className="px-4 py-3 align-top">
                       <StatusBadge status={t.status} />
                     </td>
-                    <td className="px-4 py-3 align-top text-slate-600">{t.assignee?.name ?? <span className="text-slate-400">Unassigned</span>}</td>
+                    <td className="px-4 py-3 align-top text-muted-foreground">{t.assignee?.name ?? <span className="text-muted-foreground/70">Unassigned</span>}</td>
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <span className="text-slate-600">{timeAgo(t.createdAt)}</span>
+                      <span className="text-muted-foreground">{timeAgo(t.createdAt)}</span>
                       {t.sla.overdue && (
                         <span className="mt-0.5 flex items-center gap-1 text-xs font-medium text-red-600" title={`First response target: ${t.sla.targetHours}h`}>
                           <AlertCircle className="size-3" aria-hidden /> Overdue
@@ -224,7 +224,7 @@ export function QueuePage() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm text-slate-500">
+          <div className="flex items-center justify-between border-t border-border/60 px-4 py-3 text-sm text-muted-foreground">
             <span>
               {total} {total === 1 ? "ticket" : "tickets"}
             </span>

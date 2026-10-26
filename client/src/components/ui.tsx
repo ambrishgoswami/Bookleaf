@@ -1,16 +1,20 @@
-/** Small set of shared UI primitives — deliberately minimal, no component library. */
+/**
+ * Shared UI primitives (shadcn-style, semantic tokens only). They render
+ * correctly in both the light admin theme and the dark author theme.
+ */
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { AlertTriangle, Inbox, Loader2 } from "lucide-react";
 import type { TicketPriority, TicketStatus } from "../lib/types";
 
 export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(" ");
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "brand";
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-brand-700 text-white hover:bg-brand-800 disabled:bg-brand-700/50",
-  secondary: "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:text-slate-400",
-  ghost: "text-slate-600 hover:bg-slate-100 disabled:text-slate-400",
-  danger: "bg-red-600 text-white hover:bg-red-700 disabled:bg-red-600/50",
+  primary: "bg-primary text-primary-foreground hover:bg-primary/85",
+  secondary: "border-border bg-background shadow-xs hover:bg-muted dark:bg-input/30 dark:hover:bg-input/50",
+  ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
+  danger: "bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30",
+  brand: "bg-brand font-display text-[15px] font-semibold text-brand-foreground hover:bg-brand/90",
 };
 
 export function Button({
@@ -24,7 +28,8 @@ export function Button({
   return (
     <button
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed",
+        "inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent px-3 text-sm font-medium whitespace-nowrap transition-all outline-none select-none",
+        "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0",
         VARIANTS[variant],
         className,
       )}
@@ -38,15 +43,15 @@ export function Button({
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("rounded-xl border border-slate-200 bg-white shadow-sm", className)}>{children}</div>;
+  return <div className={cx("rounded-xl bg-card text-card-foreground shadow-xs ring-1 ring-foreground/10", className)}>{children}</div>;
 }
 
 export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: ReactNode; action?: ReactNode }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -55,7 +60,7 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
 
 export function Spinner({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500" role="status">
+    <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground" role="status">
       <Loader2 className="size-5 animate-spin" aria-hidden /> {label}
     </div>
   );
@@ -63,10 +68,12 @@ export function Spinner({ label = "Loading…" }: { label?: string }) {
 
 export function EmptyState({ title, body, action }: { title: string; body?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
-      <Inbox className="size-10 text-slate-300" aria-hidden />
-      <h3 className="mt-3 font-medium text-slate-900">{title}</h3>
-      {body && <p className="mt-1 max-w-sm text-sm text-slate-500">{body}</p>}
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+        <Inbox className="size-6 text-muted-foreground" aria-hidden />
+      </div>
+      <h3 className="mt-3 font-display text-lg font-semibold text-foreground">{title}</h3>
+      {body && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{body}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
@@ -74,9 +81,9 @@ export function EmptyState({ title, body, action }: { title: string; body?: Reac
 
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-red-200 bg-red-50 px-6 py-10 text-center">
-      <AlertTriangle className="size-8 text-red-500" aria-hidden />
-      <p className="mt-2 text-sm text-red-800">{error instanceof Error ? error.message : "Something went wrong."}</p>
+    <div className="flex flex-col items-center rounded-xl border border-destructive/30 bg-destructive/5 px-6 py-10 text-center">
+      <AlertTriangle className="size-8 text-destructive" aria-hidden />
+      <p className="mt-2 text-sm text-foreground">{error instanceof Error ? error.message : "Something went wrong."}</p>
       {onRetry && (
         <Button variant="secondary" className="mt-4" onClick={onRetry}>
           Try again
@@ -88,7 +95,10 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
 
 export function Badge({ className, children, title }: { className?: string; children: ReactNode; title?: string }) {
   return (
-    <span title={title} className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", className)}>
+    <span
+      title={title}
+      className={cx("inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap [&>svg]:size-3", className)}
+    >
       {children}
     </span>
   );
@@ -102,59 +112,53 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
 };
 
 const STATUS_STYLES: Record<TicketStatus, string> = {
-  OPEN: "bg-amber-100 text-amber-800",
-  IN_PROGRESS: "bg-blue-100 text-blue-800",
-  RESOLVED: "bg-emerald-100 text-emerald-800",
-  CLOSED: "bg-slate-200 text-slate-700",
+  OPEN: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300",
+  IN_PROGRESS: "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-300",
+  RESOLVED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300",
+  CLOSED: "bg-muted text-muted-foreground",
 };
 
-export const StatusBadge = ({ status }: { status: TicketStatus }) => (
-  <Badge className={STATUS_STYLES[status]}>{STATUS_LABELS[status]}</Badge>
-);
+export const StatusBadge = ({ status }: { status: TicketStatus }) => <Badge className={STATUS_STYLES[status]}>{STATUS_LABELS[status]}</Badge>;
 
 export const PRIORITY_LABELS: Record<TicketPriority, string> = { CRITICAL: "Critical", HIGH: "High", MEDIUM: "Medium", LOW: "Low" };
 
 const PRIORITY_STYLES: Record<TicketPriority, string> = {
   CRITICAL: "bg-red-600 text-white",
-  HIGH: "bg-orange-100 text-orange-800",
-  MEDIUM: "bg-sky-100 text-sky-800",
-  LOW: "bg-slate-100 text-slate-600",
+  HIGH: "bg-orange-100 text-orange-800 dark:bg-orange-400/15 dark:text-orange-300",
+  MEDIUM: "bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/20",
+  LOW: "bg-muted text-muted-foreground",
 };
 
 export const PriorityBadge = ({ priority }: { priority: TicketPriority | null }) =>
-  priority ? (
-    <Badge className={PRIORITY_STYLES[priority]}>{PRIORITY_LABELS[priority]}</Badge>
-  ) : (
-    <Badge className="bg-slate-100 text-slate-500">Triaging…</Badge>
-  );
+  priority ? <Badge className={PRIORITY_STYLES[priority]}>{PRIORITY_LABELS[priority]}</Badge> : <Badge className="bg-muted text-muted-foreground">Triaging…</Badge>;
 
 // ---------------------------------------------------------------------------
 // Form controls
 // ---------------------------------------------------------------------------
 
 const control =
-  "block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none disabled:bg-slate-50";
+  "block w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 py-1.5 text-sm text-foreground shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-destructive dark:bg-input/30";
 
 export function Field({ label, htmlFor, error, hint, children }: { label: string; htmlFor: string; error?: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-foreground">
         {label}
       </label>
       {children}
       {error ? (
-        <p className="mt-1 text-xs text-red-600" role="alert">
+        <p className="mt-1 text-xs text-destructive" role="alert">
           {error}
         </p>
       ) : (
-        hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>
+        hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
       )}
     </div>
   );
 }
 
-export const Input = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => <input className={cx(control, className)} {...props} />;
-export const Textarea = ({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea className={cx(control, "min-h-28", className)} {...props} />
+export const Input = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => <input className={cx(control, "h-9", className)} {...props} />;
+export const Textarea = ({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea className={cx(control, "min-h-28", className)} {...props} />;
+export const Select = ({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) => (
+  <select className={cx(control, "h-9 cursor-pointer [&>option]:bg-popover [&>option]:text-popover-foreground", className)} {...props} />
 );
-export const Select = ({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={cx(control, className)} {...props} />;

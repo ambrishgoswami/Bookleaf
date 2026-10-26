@@ -67,15 +67,15 @@ export function Attachments({ ticketId, attachments, canUpload }: Props) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
-          <Paperclip className="size-4" aria-hidden /> Attachments {attachments.length > 0 && <span className="text-slate-400">({attachments.length})</span>}
+        <h3 className="flex items-center gap-1.5 text-sm font-medium text-foreground/90">
+          <Paperclip className="size-4" aria-hidden /> Attachments {attachments.length > 0 && <span className="text-muted-foreground/70">({attachments.length})</span>}
         </h3>
         {canUpload && attachments.length < MAX_ATTACHMENTS && (
           <>
             <button
               onClick={() => input.current?.click()}
               disabled={upload.isPending}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
             >
               {upload.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Upload className="size-4" aria-hidden />}
               {upload.isPending ? "Uploading…" : "Add file"}
@@ -86,7 +86,7 @@ export function Attachments({ ticketId, attachments, canUpload }: Props) {
       </div>
 
       {attachments.length === 0 ? (
-        <p className="text-sm text-slate-400">No files yet. Photos or PDFs (up to {MAX_ATTACHMENT_MB} MB) help us resolve issues faster.</p>
+        <p className="text-sm text-muted-foreground/70">No files yet. Photos or PDFs (up to {MAX_ATTACHMENT_MB} MB) help us resolve issues faster.</p>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
           {attachments.map((a) => {
@@ -96,19 +96,19 @@ export function Attachments({ ticketId, attachments, canUpload }: Props) {
                 <button
                   onClick={() => download(a)}
                   className={cx(
-                    "flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-500",
+                    "flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left hover:border-primary",
                     downloading === a.id && "opacity-60",
                   )}
                   title={`Download ${a.filename}`}
                 >
-                  <Icon className="size-5 shrink-0 text-slate-400" aria-hidden />
+                  <Icon className="size-5 shrink-0 text-muted-foreground/70" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-slate-800">{a.filename}</span>
-                    <span className="block text-xs text-slate-500">
+                    <span className="block truncate text-sm font-medium text-foreground">{a.filename}</span>
+                    <span className="block text-xs text-muted-foreground">
                       {formatSize(a.sizeBytes)} · {a.uploadedBy.role === "ADMIN" ? "BookLeaf" : a.uploadedBy.name.split(" ")[0]} · {timeAgo(a.createdAt)}
                     </span>
                   </span>
-                  {downloading === a.id ? <Loader2 className="size-4 animate-spin text-slate-400" /> : <Download className="size-4 text-slate-400" aria-hidden />}
+                  {downloading === a.id ? <Loader2 className="size-4 animate-spin text-muted-foreground/70" /> : <Download className="size-4 text-muted-foreground/70" aria-hidden />}
                 </button>
               </li>
             );

@@ -36,18 +36,18 @@ export function MessageThread({ original, messages, viewer }: Props) {
               className={cx(
                 "max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm",
                 note
-                  ? "border border-dashed border-amber-300 bg-amber-50 text-amber-950"
+                  ? "border border-dashed border-amber-300 dark:border-amber-400/30 bg-amber-50 dark:bg-amber-400/10 text-amber-950 dark:text-amber-100"
                   : mine
-                    ? "bg-brand-700 text-white"
-                    : "border border-slate-200 bg-white text-slate-800",
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-foreground",
               )}
             >
-              <div className={cx("mb-1 flex flex-wrap items-center gap-x-2 text-xs", mine && !note ? "text-brand-100" : "text-slate-500")}>
+              <div className={cx("mb-1 flex flex-wrap items-center gap-x-2 text-xs", mine && !note ? "text-primary-foreground/80" : "text-muted-foreground")}>
                 <span className="font-medium">{m.name}</span>
                 <span>{dateTime(m.createdAt)}</span>
                 {i === 0 && <span>· original query</span>}
                 {note && (
-                  <span className="inline-flex items-center gap-1 font-medium text-amber-700">
+                  <span className="inline-flex items-center gap-1 font-medium text-amber-700 dark:text-amber-300">
                     <Lock className="size-3" aria-hidden /> Internal note — not visible to author
                   </span>
                 )}
@@ -59,7 +59,7 @@ export function MessageThread({ original, messages, viewer }: Props) {
               </div>
               <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
               {i === 0 && original.attachmentName && (
-                <p className={cx("mt-2 text-xs", mine ? "text-brand-100" : "text-slate-500")}>📎 {original.attachmentName}</p>
+                <p className={cx("mt-2 text-xs", mine ? "text-primary-foreground/80" : "text-muted-foreground")}>📎 {original.attachmentName}</p>
               )}
             </div>
           </li>

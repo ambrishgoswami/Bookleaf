@@ -52,7 +52,7 @@ export function AuthorsPage() {
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground/70" aria-hidden />
           <Input
             aria-label="Search authors"
             placeholder="Search name, email, city, AUTH001 or a book title…"
@@ -71,7 +71,7 @@ export function AuthorsPage() {
               onClick={() => update("status", t.value)}
               className={cx(
                 "rounded-full px-3 py-1.5 text-sm",
-                status === t.value ? "bg-brand-700 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50",
+                status === t.value ? "bg-primary text-white" : "bg-card text-muted-foreground ring-1 ring-border hover:bg-muted/60",
               )}
             >
               {t.label}
@@ -92,20 +92,20 @@ export function AuthorsPage() {
           <ul className={cx("space-y-2 md:hidden", list.isPlaceholderData && "opacity-60")}>
             {list.data.data.map((a) => (
               <li key={a.id}>
-                <Link to={`/admin/authors/${a.id}`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                <Link to={`/admin/authors/${a.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 font-medium text-slate-900">
+                    <p className="flex items-center gap-2 font-medium text-foreground">
                       <span className="truncate">{a.name}</span>
-                      {!a.isActive && <Badge className="bg-slate-200 text-slate-600">Deactivated</Badge>}
+                      {!a.isActive && <Badge className="bg-muted text-muted-foreground">Deactivated</Badge>}
                     </p>
-                    <p className="truncate text-xs text-slate-500">
+                    <p className="truncate text-xs text-muted-foreground">
                       {a.code} · {a.email}
                     </p>
-                    <p className="mt-1 text-xs text-slate-600">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {a.bookCount} books · {inr(a.totalRoyaltyPending)} pending · {a.activeTickets} open tickets
                     </p>
                   </div>
-                  <ChevronRight className="size-4 text-slate-400" aria-hidden />
+                  <ChevronRight className="size-4 text-muted-foreground/70" aria-hidden />
                 </Link>
               </li>
             ))}
@@ -114,7 +114,7 @@ export function AuthorsPage() {
           {/* Tablets and up: table */}
           <Card className={cx("hidden overflow-hidden md:block", list.isPlaceholderData && "opacity-60")}>
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-medium tracking-wide text-slate-500 uppercase">
+              <thead className="bg-muted/60 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 <tr>
                   <th className="px-4 py-3">Author</th>
                   <th className="px-4 py-3">City</th>
@@ -124,38 +124,38 @@ export function AuthorsPage() {
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border/60">
                 {list.data.data.map((a) => (
-                  <tr key={a.id} onClick={() => navigate(`/admin/authors/${a.id}`)} className="cursor-pointer hover:bg-slate-50">
+                  <tr key={a.id} onClick={() => navigate(`/admin/authors/${a.id}`)} className="cursor-pointer hover:bg-muted/60">
                     <td className="px-4 py-3">
-                      <Link to={`/admin/authors/${a.id}`} className="font-medium text-slate-900 hover:text-brand-700" onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/admin/authors/${a.id}`} className="font-medium text-foreground hover:text-primary" onClick={(e) => e.stopPropagation()}>
                         {a.name}
                       </Link>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         {a.code} · {a.email}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {a.city && (
                         <span className="inline-flex items-center gap-1">
-                          <MapPin className="size-3.5 text-slate-400" aria-hidden /> {a.city}
+                          <MapPin className="size-3.5 text-muted-foreground/70" aria-hidden /> {a.city}
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {a.bookCount} <span className="text-xs text-slate-400">({a.publishedCount} live)</span>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {a.bookCount} <span className="text-xs text-muted-foreground/70">({a.publishedCount} live)</span>
                     </td>
                     <td className="px-4 py-3 text-right font-medium">{inr(a.totalRoyaltyPending)}</td>
-                    <td className="px-4 py-3 text-right">{a.activeTickets || <span className="text-slate-400">0</span>}</td>
+                    <td className="px-4 py-3 text-right">{a.activeTickets || <span className="text-muted-foreground/70">0</span>}</td>
                     <td className="px-4 py-3">
-                      {a.isActive ? <Badge className="bg-emerald-100 text-emerald-800">Active</Badge> : <Badge className="bg-slate-200 text-slate-600">Deactivated</Badge>}
+                      {a.isActive ? <Badge className="bg-emerald-100 dark:bg-emerald-400/15 text-emerald-800 dark:text-emerald-300">Active</Badge> : <Badge className="bg-muted text-muted-foreground">Deactivated</Badge>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </Card>
-          <p className="mt-3 text-sm text-slate-500">{list.data.meta.total} authors</p>
+          <p className="mt-3 text-sm text-muted-foreground">{list.data.meta.total} authors</p>
         </>
       )}
 

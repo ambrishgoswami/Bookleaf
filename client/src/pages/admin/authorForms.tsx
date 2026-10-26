@@ -21,7 +21,7 @@ function useFieldErrors(error: Error | null) {
 function FormError({ error, fieldErrors }: { error: Error | null; fieldErrors: Record<string, string> }) {
   if (!error || Object.keys(fieldErrors).length) return null;
   return (
-    <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+    <p className="rounded-lg bg-red-50 dark:bg-red-400/10 px-3 py-2 text-sm text-red-700 dark:text-red-300" role="alert">
       {error.message}
     </p>
   );
@@ -116,9 +116,9 @@ export function PasswordRevealModal({ password, email, onClose }: { password: st
       description="Share this with the author securely. It won't be shown again — they can change it from their profile."
       footer={<Button onClick={onClose}>Done</Button>}
     >
-      {email && <p className="mb-2 text-sm text-slate-600">Login email: <strong>{email}</strong></p>}
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-        <code className="flex-1 font-mono text-lg tracking-wide text-slate-900">{password}</code>
+      {email && <p className="mb-2 text-sm text-muted-foreground">Login email: <strong>{email}</strong></p>}
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2">
+        <code className="flex-1 font-mono text-lg tracking-wide text-foreground">{password}</code>
         <Button
           variant="secondary"
           onClick={async () => {
@@ -291,8 +291,8 @@ export function BookFormModal({ open, onClose, authorId, book, onSaved }: BookFo
         </div>
 
         {published && (
-          <fieldset className="rounded-lg border border-slate-200 p-4">
-            <legend className="px-1 text-sm font-medium text-slate-700">Sales &amp; royalty</legend>
+          <fieldset className="rounded-lg border border-border p-4">
+            <legend className="px-1 text-sm font-medium text-foreground/90">Sales &amp; royalty</legend>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Copies sold" htmlFor="b-sold" error={errors.copiesSold}>
                 <Input id="b-sold" type="number" min={0} inputMode="numeric" value={form.copiesSold} onChange={set("copiesSold")} />
@@ -304,7 +304,7 @@ export function BookFormModal({ open, onClose, authorId, book, onSaved }: BookFo
                 <Input id="b-paid" type="number" min={0} inputMode="numeric" value={form.royaltyPaid} onChange={set("royaltyPaid")} />
               </Field>
             </div>
-            <p className={pending < 0 ? "mt-2 text-sm text-red-600" : "mt-2 text-sm text-slate-500"}>Pending royalty: {inr(pending)}</p>
+            <p className={pending < 0 ? "mt-2 text-sm text-red-600" : "mt-2 text-sm text-muted-foreground"}>Pending royalty: {inr(pending)}</p>
           </fieldset>
         )}
 
@@ -318,15 +318,15 @@ export function BookFormModal({ open, onClose, authorId, book, onSaved }: BookFo
             </Select>
           </Field>
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Available on</span>
+            <span className="mb-1.5 block text-sm font-medium text-foreground/90">Available on</span>
             <div className="flex flex-wrap gap-2">
               {PLATFORMS.map((p) => (
                 <label
                   key={p}
                   className={
                     form.availableOn.includes(p)
-                      ? "cursor-pointer rounded-full bg-brand-700 px-3 py-1 text-xs font-medium text-white"
-                      : "cursor-pointer rounded-full bg-white px-3 py-1 text-xs text-slate-600 ring-1 ring-slate-300"
+                      ? "cursor-pointer rounded-full bg-primary px-3 py-1 text-xs font-medium text-white"
+                      : "cursor-pointer rounded-full bg-card px-3 py-1 text-xs text-muted-foreground ring-1 ring-border"
                   }
                 >
                   <input type="checkbox" className="sr-only" checked={form.availableOn.includes(p)} onChange={() => togglePlatform(p)} />

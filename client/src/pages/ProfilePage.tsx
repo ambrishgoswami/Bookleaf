@@ -44,8 +44,8 @@ function DetailsCard() {
 
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="mb-4 flex items-center gap-2 font-semibold text-slate-900">
-        <UserCircle className="size-5 text-slate-400" aria-hidden /> Account details
+      <h2 className="mb-4 flex items-center gap-2 font-semibold text-foreground">
+        <UserCircle className="size-5 text-muted-foreground/70" aria-hidden /> Account details
       </h2>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -67,8 +67,8 @@ function DetailsCard() {
           )}
         </div>
         {isAuthor && user?.author && (
-          <p className="text-sm text-slate-500">
-            Author ID <strong className="text-slate-700">{user.author.code}</strong> · with BookLeaf since {date(user.author.joinedDate)}
+          <p className="text-sm text-muted-foreground">
+            Author ID <strong className="text-foreground/90">{user.author.code}</strong> · with BookLeaf since {date(user.author.joinedDate)}
           </p>
         )}
         {save.error && !Object.keys(errors).length && <p className="text-sm text-red-600">{save.error.message}</p>}
@@ -107,8 +107,8 @@ function PasswordCard() {
 
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="mb-4 flex items-center gap-2 font-semibold text-slate-900">
-        <KeyRound className="size-5 text-slate-400" aria-hidden /> Change password
+      <h2 className="mb-4 flex items-center gap-2 font-semibold text-foreground">
+        <KeyRound className="size-5 text-muted-foreground/70" aria-hidden /> Change password
       </h2>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <Field label="Current password" htmlFor="current" error={errors.currentPassword}>

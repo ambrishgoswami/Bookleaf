@@ -69,7 +69,7 @@ export function AuthorDetailPage() {
 
   return (
     <>
-      <Link to="/admin/authors" className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+      <Link to="/admin/authors" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> All authors
       </Link>
 
@@ -77,25 +77,25 @@ export function AuthorDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-slate-900">{a.name}</h1>
-              <Badge className="bg-slate-100 text-slate-600">{a.code}</Badge>
-              {a.isActive ? <Badge className="bg-emerald-100 text-emerald-800">Active</Badge> : <Badge className="bg-slate-200 text-slate-600">Deactivated</Badge>}
+              <h1 className="text-2xl font-semibold text-foreground">{a.name}</h1>
+              <Badge className="bg-muted text-muted-foreground">{a.code}</Badge>
+              {a.isActive ? <Badge className="bg-emerald-100 dark:bg-emerald-400/15 text-emerald-800 dark:text-emerald-300">Active</Badge> : <Badge className="bg-muted text-muted-foreground">Deactivated</Badge>}
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1">
-                <Mail className="size-4 text-slate-400" aria-hidden /> {a.email}
+                <Mail className="size-4 text-muted-foreground/70" aria-hidden /> {a.email}
               </span>
               {a.phone && (
                 <span className="inline-flex items-center gap-1">
-                  <Phone className="size-4 text-slate-400" aria-hidden /> {a.phone}
+                  <Phone className="size-4 text-muted-foreground/70" aria-hidden /> {a.phone}
                 </span>
               )}
               {a.city && (
                 <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-4 text-slate-400" aria-hidden /> {a.city}
+                  <MapPin className="size-4 text-muted-foreground/70" aria-hidden /> {a.city}
                 </span>
               )}
-              <span className="text-slate-400">Joined {date(a.joinedDate)}</span>
+              <span className="text-muted-foreground/70">Joined {date(a.joinedDate)}</span>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -111,7 +111,7 @@ export function AuthorDetailPage() {
           </div>
         </div>
 
-        <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-border/60 pt-5 sm:grid-cols-4">
           {[
             ["Copies sold", number(s.totalCopiesSold)],
             ["Royalty earned", inr(s.totalRoyaltyEarned)],
@@ -119,8 +119,8 @@ export function AuthorDetailPage() {
             ["Royalty pending", inr(s.totalRoyaltyPending)],
           ].map(([label, value]) => (
             <div key={label}>
-              <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</dt>
-              <dd className="mt-1 text-xl font-semibold text-slate-900">{value}</dd>
+              <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+              <dd className="mt-1 text-xl font-semibold text-foreground">{value}</dd>
             </div>
           ))}
         </dl>
@@ -128,7 +128,7 @@ export function AuthorDetailPage() {
 
       <section className="mt-6">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Books ({a.books.length})</h2>
+          <h2 className="text-lg font-semibold text-foreground">Books ({a.books.length})</h2>
           <Button onClick={() => setBookForm({ open: true })}>
             <BookPlus className="size-4" aria-hidden /> Add book
           </Button>
@@ -141,36 +141,36 @@ export function AuthorDetailPage() {
               <Card key={b.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-900">{b.title}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="truncate font-medium text-foreground">{b.title}</p>
+                    <p className="text-xs text-muted-foreground">
                       {b.code} · ISBN {b.isbn} · {b.genre}
                     </p>
                   </div>
-                  <Badge className={b.isPublished ? "bg-emerald-100 text-emerald-800" : "bg-violet-100 text-violet-800"}>
+                  <Badge className={b.isPublished ? "bg-emerald-100 dark:bg-emerald-400/15 text-emerald-800 dark:text-emerald-300" : "bg-violet-100 dark:bg-violet-400/15 text-violet-800 dark:text-violet-300"}>
                     {b.isPublished ? "Live" : b.production?.stage}
                   </Badge>
                 </div>
                 {b.isPublished ? (
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
                     <div>
-                      <dt className="text-xs text-slate-500">Sold</dt>
+                      <dt className="text-xs text-muted-foreground">Sold</dt>
                       <dd className="font-medium">{number(b.copiesSold)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-500">Pending</dt>
-                      <dd className="font-medium text-brand-700">{inr(b.royaltyPending)}</dd>
+                      <dt className="text-xs text-muted-foreground">Pending</dt>
+                      <dd className="font-medium text-primary">{inr(b.royaltyPending)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-500">Last payout</dt>
+                      <dt className="text-xs text-muted-foreground">Last payout</dt>
                       <dd className="font-medium">{b.lastRoyaltyPayoutDate ? date(b.lastRoyaltyPayoutDate) : "Never"}</dd>
                     </div>
                   </dl>
                 ) : (
-                  <p className="mt-3 text-sm text-slate-500">
+                  <p className="mt-3 text-sm text-muted-foreground">
                     Step {(b.production?.index ?? 0) + 1} of {b.production?.totalStages} in production
                   </p>
                 )}
-                <div className="mt-3 flex flex-wrap gap-1 border-t border-slate-100 pt-3">
+                <div className="mt-3 flex flex-wrap gap-1 border-t border-border/60 pt-3">
                   <Button variant="ghost" onClick={() => setBookForm({ open: true, book: b })}>
                     <Pencil className="size-4" aria-hidden /> Edit
                   </Button>
@@ -192,16 +192,16 @@ export function AuthorDetailPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">Recent tickets</h2>
+        <h2 className="mb-3 text-lg font-semibold text-foreground">Recent tickets</h2>
         {a.tickets.length === 0 ? (
-          <p className="text-sm text-slate-500">No support tickets from this author.</p>
+          <p className="text-sm text-muted-foreground">No support tickets from this author.</p>
         ) : (
-          <Card className="divide-y divide-slate-100">
+          <Card className="divide-y divide-border/60">
             {a.tickets.map((t) => (
-              <Link key={t.id} to={`/admin/tickets/${t.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-slate-50">
+              <Link key={t.id} to={`/admin/tickets/${t.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-muted/60">
                 <PriorityBadge priority={t.priority} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{t.subject}</span>
-                <span className="text-xs text-slate-500">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{t.subject}</span>
+                <span className="text-xs text-muted-foreground">
                   {t.reference} · {timeAgo(t.createdAt)}
                 </span>
                 <StatusBadge status={t.status} />

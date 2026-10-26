@@ -52,7 +52,7 @@ export function TicketsPage() {
                 onClick={() => setStatus(f.value)}
                 className={cx(
                   "rounded-full px-3 py-1 text-sm whitespace-nowrap",
-                  status === f.value ? "bg-brand-700 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50",
+                  status === f.value ? "bg-primary text-white" : "bg-card text-muted-foreground ring-1 ring-border hover:bg-muted/60",
                 )}
               >
                 {f.label}
@@ -77,19 +77,19 @@ export function TicketsPage() {
                   <Link
                     to={`/tickets/${t.id}`}
                     className={cx(
-                      "block rounded-xl border bg-white p-4 transition-colors hover:border-brand-500",
-                      t.id === id ? "border-brand-500 ring-2 ring-brand-500/20" : "border-slate-200",
+                      "block rounded-xl border bg-card p-4 transition-colors hover:border-primary",
+                      t.id === id ? "border-primary ring-2 ring-primary/20" : "border-border",
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-slate-500">{t.reference}</span>
+                      <span className="text-xs font-medium text-muted-foreground">{t.reference}</span>
                       <StatusBadge status={t.status} />
                     </div>
-                    <p className="mt-1 font-medium text-slate-900">{t.subject}</p>
-                    <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-500">
+                    <p className="mt-1 font-medium text-foreground">{t.subject}</p>
+                    <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                       <span>{t.book?.title ?? "General / Account"}</span>
                       <span>Updated {timeAgo(t.updatedAt)}</span>
-                      {t.messages.some((m) => m.sender.role === "ADMIN") && <span className="text-brand-700">● Reply from BookLeaf</span>}
+                      {t.messages.some((m) => m.sender.role === "ADMIN") && <span className="text-primary">● Reply from BookLeaf</span>}
                     </p>
                   </Link>
                 </li>
@@ -102,7 +102,7 @@ export function TicketsPage() {
           {id ? (
             <TicketDetail id={id} />
           ) : (
-            <div className="hidden h-full items-center justify-center rounded-xl border border-dashed border-slate-300 p-10 text-sm text-slate-500 lg:flex">
+            <div className="hidden h-full items-center justify-center rounded-xl border border-dashed border-border p-10 text-sm text-muted-foreground lg:flex">
               Select a ticket to see the conversation.
             </div>
           )}
@@ -161,28 +161,28 @@ function TicketDetail({ id }: { id: string }) {
 
   return (
     <Card className="flex flex-col">
-      <div className="border-b border-slate-100 p-5">
-        <Link to="/tickets" className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 lg:hidden">
+      <div className="border-b border-border/60 p-5">
+        <Link to="/tickets" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground lg:hidden">
           <ArrowLeft className="size-4" /> All tickets
         </Link>
         {justCreated === t.reference && (
-          <p className="mb-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <p className="mb-3 flex items-center gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-400/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
             <CheckCircle2 className="size-4" aria-hidden /> Ticket {t.reference} submitted. You'll see our reply here as soon as it's sent.
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-slate-500">{t.reference}</span>
+          <span className="text-sm font-medium text-muted-foreground">{t.reference}</span>
           <StatusBadge status={t.status} />
-          {t.categoryLabel && <Badge className="bg-slate-100 text-slate-600">{t.categoryLabel}</Badge>}
+          {t.categoryLabel && <Badge className="bg-muted text-muted-foreground">{t.categoryLabel}</Badge>}
         </div>
-        <h2 className="mt-2 text-xl font-semibold text-slate-900">{t.subject}</h2>
-        <p className="mt-1 flex flex-wrap items-center gap-x-3 text-sm text-slate-500">
+        <h2 className="mt-2 text-xl font-semibold text-foreground">{t.subject}</h2>
+        <p className="mt-1 flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <BookOpen className="size-3.5" aria-hidden /> {t.book?.title ?? "General / Account Level"}
           </span>
           {t.handledBy && <span>Handled by {t.handledBy}</span>}
         </p>
-        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">{STATUS_EXPLAINER[t.status]}</p>
+        <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground">{STATUS_EXPLAINER[t.status]}</p>
       </div>
 
       <div className="p-5">
@@ -193,12 +193,12 @@ function TicketDetail({ id }: { id: string }) {
         />
       </div>
 
-      <div className="border-t border-slate-100 p-5">
+      <div className="border-t border-border/60 p-5">
         <Attachments ticketId={t.id} attachments={t.attachments} canUpload={t.status !== "CLOSED"} />
       </div>
 
       {t.status !== "CLOSED" && (
-        <form onSubmit={submit} className="border-t border-slate-100 p-5">
+        <form onSubmit={submit} className="border-t border-border/60 p-5">
           <label htmlFor="reply" className="sr-only">
             Reply
           </label>

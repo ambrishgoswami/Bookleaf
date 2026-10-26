@@ -18,9 +18,9 @@ export const PRIORITIES: TicketPriority[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"
 export const STATUSES: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 
 const SOURCE_META: Record<DecisionSource, { label: string; title: string; icon: typeof Bot; className: string }> = {
-  AI: { label: "AI", title: "Set by the AI model", icon: Bot, className: "bg-violet-100 text-violet-700" },
-  FALLBACK: { label: "Rules", title: "AI was unavailable — set by keyword rules. Please verify.", icon: Wrench, className: "bg-amber-100 text-amber-800" },
-  ADMIN: { label: "Admin", title: "Set or confirmed by an admin", icon: ShieldCheck, className: "bg-emerald-100 text-emerald-700" },
+  AI: { label: "AI", title: "Set by the AI model", icon: Bot, className: "bg-violet-100 dark:bg-violet-400/15 text-violet-700 dark:text-violet-300" },
+  FALLBACK: { label: "Rules", title: "AI was unavailable — set by keyword rules. Please verify.", icon: Wrench, className: "bg-amber-100 dark:bg-amber-400/15 text-amber-800 dark:text-amber-300" },
+  ADMIN: { label: "Admin", title: "Set or confirmed by an admin", icon: ShieldCheck, className: "bg-emerald-100 dark:bg-emerald-400/15 text-emerald-700 dark:text-emerald-300" },
 };
 
 /** Small tag showing who decided a category/priority. */
@@ -50,7 +50,7 @@ export function AiStatusBanner() {
   const status = data?.data;
   if (!status || status.available) return null;
   return (
-    <div className="mb-6 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+    <div className="mb-6 flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-400/30 bg-amber-50 dark:bg-amber-400/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-300" role="status">
       <Wrench className="mt-0.5 size-4 shrink-0" aria-hidden />
       <p>
         <strong>AI assistance is {status.configured ? "temporarily unavailable" : "not configured"}.</strong> New tickets are being classified by keyword rules

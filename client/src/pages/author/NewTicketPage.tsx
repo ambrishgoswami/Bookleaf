@@ -111,7 +111,7 @@ export function NewTicketPage() {
             hint={
               <span className="flex justify-between">
                 <span>Include dates, platforms or amounts if relevant — it helps us resolve this faster.</span>
-                <span className={description.trim().length < DESCRIPTION_MIN ? "text-slate-400" : "text-slate-500"}>
+                <span className={description.trim().length < DESCRIPTION_MIN ? "text-muted-foreground/70" : "text-muted-foreground"}>
                   {description.length}/{DESCRIPTION_MAX}
                 </span>
               </span>
@@ -136,15 +136,15 @@ export function NewTicketPage() {
             {files.length > 0 && (
               <ul className="mb-2 space-y-1.5">
                 {files.map((file, i) => (
-                  <li key={`${file.name}-${i}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                  <li key={`${file.name}-${i}`} className="flex items-center justify-between rounded-lg border border-border bg-muted/60 px-3 py-2 text-sm">
                     <span className="flex min-w-0 items-center gap-2">
-                      <Paperclip className="size-4 shrink-0 text-slate-400" aria-hidden />
-                      <span className="truncate">{file.name}</span> <span className="shrink-0 text-slate-400">({formatSize(file.size)})</span>
+                      <Paperclip className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
+                      <span className="truncate">{file.name}</span> <span className="shrink-0 text-muted-foreground/70">({formatSize(file.size)})</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => setFiles((f) => f.filter((_, j) => j !== i))}
-                      className="rounded p-1 text-slate-500 hover:bg-slate-200"
+                      className="rounded p-1 text-muted-foreground hover:bg-muted"
                       aria-label={`Remove ${file.name}`}
                     >
                       <X className="size-4" />
@@ -156,7 +156,7 @@ export function NewTicketPage() {
             {files.length < MAX_ATTACHMENTS && (
               <label
                 htmlFor="attachment"
-                className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500 hover:border-brand-500 hover:text-brand-700"
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground hover:border-primary hover:text-primary"
               >
                 <Paperclip className="size-4" aria-hidden /> {files.length ? "Add another file" : "Choose files"}
                 <input
@@ -175,7 +175,7 @@ export function NewTicketPage() {
           </Field>
 
           {create.error && !Object.keys(fieldErrors).length && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            <p className="rounded-lg bg-red-50 dark:bg-red-400/10 px-3 py-2 text-sm text-red-700 dark:text-red-300" role="alert">
               {create.error.message}
             </p>
           )}

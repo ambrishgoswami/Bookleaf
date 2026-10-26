@@ -22,9 +22,9 @@ interface Toast {
 const ToastContext = createContext<((message: string, tone?: ToastTone) => void) | null>(null);
 
 const TONES: Record<ToastTone, { icon: typeof Info; className: string }> = {
-  success: { icon: CheckCircle2, className: "border-emerald-200 bg-emerald-50 text-emerald-900" },
-  error: { icon: XCircle, className: "border-red-200 bg-red-50 text-red-900" },
-  info: { icon: Info, className: "border-slate-200 bg-white text-slate-800" },
+  success: { icon: CheckCircle2, className: "border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-400/10 text-emerald-900 dark:text-emerald-300" },
+  error: { icon: XCircle, className: "border-red-200 dark:border-red-400/30 bg-red-50 dark:bg-red-400/10 text-red-900 dark:text-red-300" },
+  info: { icon: Info, className: "border-border bg-card text-foreground" },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -68,6 +68,12 @@ export function useToast() {
 // Modal
 // ---------------------------------------------------------------------------
 
+/**
+ * Modals render in a portal on <body>, outside the layout that sets the theme.
+ * Layouts declare their theme here so dialogs match the page they open on.
+ */
+export const ThemeScope = createContext<"light" | "dark">("light");
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -80,6 +86,7 @@ interface ModalProps {
 
 /** Bottom sheet on phones, centred dialog on larger screens. Esc and backdrop close it. */
 export function Modal({ open, onClose, title, description, children, footer, size = "md" }: ModalProps) {
+  const theme = useContext(ThemeScope);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -94,25 +101,25 @@ export function Modal({ open, onClose, title, description, children, footer, siz
 
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]" onClick={onClose} />
+    <div className={cx("fixed inset-0 z-50 flex items-end justify-center text-foreground sm:items-center sm:p-4", theme === "dark" && "dark")} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={onClose} />
       <div
         className={cx(
-          "relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl",
+          "relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-card shadow-xl ring-1 ring-foreground/10 sm:rounded-2xl dark:bg-[#1e1e1e]/95 dark:ring-white/10 dark:backdrop-blur-md sm:dark:rounded-[20px]",
           size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md",
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-            {description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}
+            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
           </div>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
+          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground/70 hover:bg-muted hover:text-foreground/90" aria-label="Close">
             <X className="size-5" />
           </button>
         </div>
         <div className="overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 px-5 py-3">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -147,7 +154,7 @@ export function ConfirmDialog({ open, title, body, confirmLabel, danger, loading
         </>
       }
     >
-      <div className="flex gap-3 text-sm text-slate-600">
+      <div className="flex gap-3 text-sm text-muted-foreground">
         {danger && <AlertTriangle className="size-5 shrink-0 text-red-500" aria-hidden />}
         <div>{body}</div>
       </div>

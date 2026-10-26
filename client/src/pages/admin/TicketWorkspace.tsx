@@ -32,7 +32,7 @@ export function TicketWorkspace() {
 
   return (
     <>
-      <Link to="/admin/tickets" className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+      <Link to="/admin/tickets" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Back to queue
       </Link>
 
@@ -40,17 +40,17 @@ export function TicketWorkspace() {
         <div className="min-w-0 space-y-6">
           <Card className="p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-slate-500">{t.reference}</span>
+              <span className="text-sm font-medium text-muted-foreground">{t.reference}</span>
               <StatusBadge status={t.status} />
               <PriorityBadge priority={t.priority} />
               {t.sla.overdue && (
-                <Badge className="bg-red-100 text-red-700">
+                <Badge className="bg-red-100 dark:bg-red-400/15 text-red-700 dark:text-red-300">
                   <AlertCircle className="size-3" aria-hidden /> First response overdue
                 </Badge>
               )}
             </div>
-            <h1 className="mt-2 text-xl font-semibold text-slate-900">{t.subject}</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="mt-2 text-xl font-semibold text-foreground">{t.subject}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               {t.author.name} ({t.author.code}) · {t.book?.title ?? "General / Account Level"} · opened {timeAgo(t.createdAt)}
             </p>
           </Card>
@@ -153,7 +153,7 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
 
   return (
     <Card>
-      <div className="flex border-b border-slate-100" role="tablist">
+      <div className="flex border-b border-border/60" role="tablist">
         {(
           [
             ["REPLY", "Reply to author", Send],
@@ -167,7 +167,7 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
             onClick={() => switchMode(value)}
             className={cx(
               "flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium",
-              mode === value ? "border-brand-700 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800",
+              mode === value ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             <Icon className="size-4" aria-hidden /> {label}
@@ -180,7 +180,7 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
           <DraftStatus draft={d} loading={draft.isPending || regenerate.isPending} error={draft.error ?? regenerate.error} />
         )}
         {mode === "INTERNAL_NOTE" && (
-          <p className="flex items-center gap-2 text-sm text-amber-800">
+          <p className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
             <Lock className="size-4" aria-hidden /> Only the BookLeaf team can see internal notes.
           </p>
         )}
@@ -195,16 +195,16 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
             if (!e.target.value) setFromDraft(false);
           }}
           placeholder={mode === "REPLY" ? "Write your reply…" : "e.g. Checked payout file — bank details missing."}
-          className={mode === "INTERNAL_NOTE" ? "border-amber-300 bg-amber-50/40" : undefined}
+          className={mode === "INTERNAL_NOTE" ? "border-amber-300 dark:border-amber-400/30 bg-amber-50/40" : undefined}
         />
 
         {mode === "REPLY" && d && d.suggestedActions.length > 0 && (
-          <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-            <p className="mb-1.5 text-xs font-medium tracking-wide text-slate-500 uppercase">Suggested follow-ups (internal)</p>
-            <ul className="space-y-1 text-sm text-slate-700">
+          <div className="rounded-lg bg-muted/60 px-3 py-2.5">
+            <p className="mb-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">Suggested follow-ups (internal)</p>
+            <ul className="space-y-1 text-sm text-foreground/90">
               {d.suggestedActions.map((a) => (
                 <li key={a} className="flex items-start gap-2">
-                  <CheckSquare className="mt-0.5 size-4 shrink-0 text-slate-400" aria-hidden /> {a}
+                  <CheckSquare className="mt-0.5 size-4 shrink-0 text-muted-foreground/70" aria-hidden /> {a}
                 </li>
               ))}
             </ul>
@@ -229,7 +229,7 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
 
         {send.error && <p className="text-sm text-red-600">{send.error.message}</p>}
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-3">
           {mode === "REPLY" ? (
             <>
               <Button variant="secondary" disabled={!body.trim()} loading={send.isPending && send.variables === "RESOLVED"} onClick={() => send.mutate("RESOLVED")}>
@@ -253,16 +253,16 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
 function DraftStatus({ draft, loading, error }: { draft: Draft | undefined; loading: boolean; error: Error | null }) {
   if (loading) {
     return (
-      <p className="flex items-center gap-2 text-sm text-violet-700">
+      <p className="flex items-center gap-2 text-sm text-violet-700 dark:text-violet-300">
         <Sparkles className="size-4 animate-pulse" aria-hidden /> Drafting a reply from the knowledge base and this author's account…
       </p>
     );
   }
-  if (error) return <p className="text-sm text-slate-500">Couldn't load a draft ({error.message}). You can write the reply manually.</p>;
+  if (error) return <p className="text-sm text-muted-foreground">Couldn't load a draft ({error.message}). You can write the reply manually.</p>;
   if (!draft) return null;
   if (draft.source === "TEMPLATE") {
     return (
-      <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <p className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-400/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-300">
         <Wrench className="mt-0.5 size-4 shrink-0" aria-hidden />
         <span>
           <strong>Policy template</strong> — {AI_ERROR_LABELS[draft.aiError ?? ""] ?? "AI draft unavailable"}. Fill in the bracketed parts before sending.
@@ -271,9 +271,9 @@ function DraftStatus({ draft, loading, error }: { draft: Draft | undefined; load
     );
   }
   return (
-    <p className="flex items-center gap-2 text-sm text-violet-700">
+    <p className="flex items-center gap-2 text-sm text-violet-700 dark:text-violet-300">
       <Bot className="size-4" aria-hidden /> AI draft — review and edit before sending.
-      <span className="text-xs text-slate-400">
+      <span className="text-xs text-muted-foreground/70">
         {draft.model} · {draft.cached ? "saved" : "generated"} {timeAgo(draft.generatedAt)}
       </span>
     </p>
@@ -290,10 +290,10 @@ function PropertiesCard({ ticket: t, onChange, saving, error }: { ticket: AdminT
 
   return (
     <Card className={cx("space-y-4 p-4", saving && "opacity-70")}>
-      <h2 className="text-sm font-semibold text-slate-900">Ticket</h2>
+      <h2 className="text-sm font-semibold text-foreground">Ticket</h2>
 
       <label className="block text-sm">
-        <span className="mb-1 block text-slate-500">Status</span>
+        <span className="mb-1 block text-muted-foreground">Status</span>
         <Select value={t.status} onChange={(e) => onChange({ status: e.target.value as TicketStatus })}>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -304,7 +304,7 @@ function PropertiesCard({ ticket: t, onChange, saving, error }: { ticket: AdminT
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 flex items-center justify-between text-slate-500">
+        <span className="mb-1 flex items-center justify-between text-muted-foreground">
           Category <SourceTag source={t.categorySource} />
         </span>
         <Select value={t.category ?? ""} onChange={(e) => onChange({ category: e.target.value as TicketCategory })}>
@@ -318,7 +318,7 @@ function PropertiesCard({ ticket: t, onChange, saving, error }: { ticket: AdminT
       </label>
 
       <label className="block text-sm">
-        <span className="mb-1 flex items-center justify-between text-slate-500">
+        <span className="mb-1 flex items-center justify-between text-muted-foreground">
           Priority <SourceTag source={t.prioritySource} />
         </span>
         <Select value={t.priority ?? ""} onChange={(e) => onChange({ priority: e.target.value as TicketPriority })}>
@@ -332,14 +332,14 @@ function PropertiesCard({ ticket: t, onChange, saving, error }: { ticket: AdminT
       </label>
 
       {t.aiReasoning && t.categorySource !== "ADMIN" && (
-        <p className="rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-900">
+        <p className="rounded-lg bg-violet-50 dark:bg-violet-400/10 px-3 py-2 text-xs text-violet-900 dark:text-violet-300">
           <Bot className="mr-1 inline size-3.5" aria-hidden />
           {t.aiReasoning}
         </p>
       )}
 
       <div className="text-sm">
-        <span className="mb-1 block text-slate-500">Assignee</span>
+        <span className="mb-1 block text-muted-foreground">Assignee</span>
         <div className="flex gap-2">
           <Select value={t.assignee?.id ?? ""} onChange={(e) => onChange({ assigneeId: e.target.value || null })}>
             <option value="">Unassigned</option>
@@ -357,7 +357,7 @@ function PropertiesCard({ ticket: t, onChange, saving, error }: { ticket: AdminT
         </div>
       </div>
 
-      <div className="border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
         {t.firstResponseAt ? (
           <>First response {dateTime(t.firstResponseAt)}</>
         ) : (
@@ -381,39 +381,39 @@ function AuthorCard({ ticket: t }: { ticket: AdminTicket }) {
 
   return (
     <Card className="space-y-3 p-4 text-sm">
-      <h2 className="font-semibold text-slate-900">Author</h2>
+      <h2 className="font-semibold text-foreground">Author</h2>
       <div>
-        <p className="font-medium text-slate-800">{t.author.name}</p>
-        <p className="text-slate-500">
+        <p className="font-medium text-foreground">{t.author.name}</p>
+        <p className="text-muted-foreground">
           {t.author.email} · {t.author.code}
         </p>
       </div>
       {t.book && (
-        <div className="border-t border-slate-100 pt-3">
-          <p className="font-medium text-slate-800">{t.book.title}</p>
+        <div className="border-t border-border/60 pt-3">
+          <p className="font-medium text-foreground">{t.book.title}</p>
           {b ? (
             <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-              <dt className="text-slate-500">Status</dt>
+              <dt className="text-muted-foreground">Status</dt>
               <dd>{b.isPublished ? "Published & Live" : b.production?.stage ?? b.status}</dd>
-              <dt className="text-slate-500">ISBN</dt>
+              <dt className="text-muted-foreground">ISBN</dt>
               <dd>{b.isbn}</dd>
               {b.isPublished && (
                 <>
-                  <dt className="text-slate-500">Published</dt>
+                  <dt className="text-muted-foreground">Published</dt>
                   <dd>{date(b.publicationDate)}</dd>
-                  <dt className="text-slate-500">Copies sold</dt>
+                  <dt className="text-muted-foreground">Copies sold</dt>
                   <dd>{b.copiesSold}</dd>
-                  <dt className="text-slate-500">Royalty pending</dt>
+                  <dt className="text-muted-foreground">Royalty pending</dt>
                   <dd className="font-medium">{inr(b.royaltyPending)}</dd>
-                  <dt className="text-slate-500">Last payout</dt>
+                  <dt className="text-muted-foreground">Last payout</dt>
                   <dd>{b.lastRoyaltyPayoutDate ? date(b.lastRoyaltyPayoutDate) : "Never"}</dd>
-                  <dt className="text-slate-500">Platforms</dt>
+                  <dt className="text-muted-foreground">Platforms</dt>
                   <dd>{b.availableOn.join(", ")}</dd>
                 </>
               )}
             </dl>
           ) : (
-            book.isPending && <p className="text-xs text-slate-400">Loading book…</p>
+            book.isPending && <p className="text-xs text-muted-foreground/70">Loading book…</p>
           )}
         </div>
       )}
@@ -436,15 +436,15 @@ const ACTION_LABELS: Record<string, (a: Activity) => string> = {
 function ActivityCard({ activities }: { activities: Activity[] }) {
   return (
     <Card className="p-4 text-sm">
-      <h2 className="mb-3 font-semibold text-slate-900">Activity</h2>
-      <ol className="space-y-2.5 border-l border-slate-200 pl-4">
+      <h2 className="mb-3 font-semibold text-foreground">Activity</h2>
+      <ol className="space-y-2.5 border-l border-border pl-4">
         {activities.map((a) => (
           <li key={a.id} className="relative">
-            <span className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-slate-300" aria-hidden />
-            <p className="text-slate-700">
+            <span className="absolute top-1.5 -left-[21px] size-2 rounded-full bg-muted-foreground/30" aria-hidden />
+            <p className="text-foreground/90">
               <span className="font-medium">{a.actor?.name ?? "System"}</span> {ACTION_LABELS[a.action]?.(a) ?? a.action}
             </p>
-            <p className="text-xs text-slate-400">{dateTime(a.createdAt)}</p>
+            <p className="text-xs text-muted-foreground/70">{dateTime(a.createdAt)}</p>
           </li>
         ))}
       </ol>
