@@ -39,10 +39,12 @@ export const env = {
   ...parsed.data,
   GEMINI_API_KEY: parsed.data.GEMINI_API_KEY ?? parsed.data.GOOGLE_API_KEY,
   aiProviders: parsed.data.AI_PROVIDERS.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean),
-  // A bare host (as Render's blueprint provides) is treated as https.
+  // A bare host is treated as https; Render's blueprint `host` is just the
+  // service name (no dots), which lives under .onrender.com.
   corsOrigins: parsed.data.CORS_ORIGIN.split(",")
     .map((o) => o.trim().replace(/\/$/, ""))
     .filter(Boolean)
+    .map((o) => (o.includes(".") || o.includes(":") ? o : `${o}.onrender.com`))
     .map((o) => (/^https?:\/\//.test(o) ? o : `https://${o}`)),
   isProduction: parsed.data.NODE_ENV === "production",
   isTest: parsed.data.NODE_ENV === "test",

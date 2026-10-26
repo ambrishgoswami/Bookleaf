@@ -5,10 +5,15 @@
 
 /**
  * Same-origin in dev (Vite proxy); set VITE_API_URL when the API is on another
- * host. A bare host (as Render's blueprint provides) is treated as https.
+ * host. A bare host is treated as https; Render's blueprint `host` is just the
+ * service name (no dots), which lives under .onrender.com.
  */
-const apiOrigin = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
-export const API_BASE = `${apiOrigin && !/^https?:\/\//.test(apiOrigin) ? `https://${apiOrigin}` : apiOrigin}/api/v1`;
+const rawApiOrigin = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const apiHost = rawApiOrigin && !rawApiOrigin.includes(".") && !rawApiOrigin.includes(":")
+  ? `${rawApiOrigin}.onrender.com`
+  : rawApiOrigin;
+const apiOrigin = apiHost && !/^https?:\/\//.test(apiHost) ? `https://${apiHost}` : apiHost;
+export const API_BASE = `${apiOrigin}/api/v1`;
 
 const TOKEN_KEY = "bookleaf.token";
 
