@@ -18,6 +18,8 @@ import { aiRouter, draftRouter } from "./modules/ai/ai.routes.js";
 import { docsRouter } from "./docs.js";
 import { authorsRouter } from "./modules/authors/authors.routes.js";
 import { attachmentsRouter } from "./modules/attachments/attachments.routes.js";
+import { macrosRouter } from "./modules/macros/macros.routes.js";
+import { helpRouter } from "./modules/help/help.routes.js";
 
 export function createApp() {
   const app = express();
@@ -42,6 +44,8 @@ export function createApp() {
   api.use("/tickets", draftRouter);
   api.use("/tickets", attachmentsRouter);
   api.use("/authors", authorsRouter);
+  api.use("/macros", macrosRouter);
+  api.use("/help", helpRouter);
   api.use("/ai", aiRouter);
   api.use("/admins", adminsRouter);
   api.use("/events", eventsRouter);

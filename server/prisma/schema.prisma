@@ -76,6 +76,7 @@ model User {
   messages        TicketMessage[]
   activities      TicketActivity[]
   attachments     Attachment[]
+  macros          Macro[]
 }
 
 model Author {
@@ -143,10 +144,16 @@ model Ticket {
   assigneeId String?
   assignee   User?   @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
-  firstResponseAt DateTime?
-  resolvedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  firstResponseAt  DateTime?
+  /// When the author last viewed the ticket — replies after this are "unread".
+  authorLastReadAt DateTime?
+  /// Author satisfaction (CSAT), 1–5, given once the ticket is resolved.
+  rating           Int?
+  ratingComment    String?
+  ratedAt          DateTime?
+  resolvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   messages    TicketMessage[]
   activities  TicketActivity[]
@@ -250,4 +257,19 @@ model Attachment {
   createdAt    DateTime @default(now())
 
   @@index([ticketId])
+}
+
+/// Saved replies ("macros") admins can insert into a response. The body may use
+/// {{authorFirstName}}, {{ticketRef}} and {{bookTitle}} placeholders.
+model Macro {
+  id          String          @id @default(cuid())
+  title       String
+  body        String
+  /// Optional: suggested first for tickets in this category.
+  category    TicketCategory?
+  usageCount  Int             @default(0)
+  createdById String?
+  createdBy   User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }

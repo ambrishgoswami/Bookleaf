@@ -65,7 +65,7 @@ export async function getTicket(user: AuthUser, ticketId: string) {
   return isAdmin(user) ? toAdminTicket(ticket) : toAuthorTicket(ticket);
 }
 
-function buildWhere(user: AuthUser, q: ListTicketsInput): Prisma.TicketWhereInput {
+export function buildWhere(user: AuthUser, q: ListTicketsInput): Prisma.TicketWhereInput {
   const where: Prisma.TicketWhereInput = {};
   if (!isAdmin(user)) where.authorId = user.authorId!;
 

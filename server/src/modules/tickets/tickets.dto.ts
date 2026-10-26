@@ -62,6 +62,8 @@ function baseFields(t: TicketWithRelations) {
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
     resolvedAt: t.resolvedAt?.toISOString() ?? null,
+    rating: t.rating,
+    ratingComment: t.ratingComment,
   };
 }
 
@@ -80,6 +82,8 @@ export function toAuthorTicket(t: TicketWithRelations) {
     ...baseFields(t),
     // Authors see who is handling their ticket by first name only.
     handledBy: t.assignee ? t.assignee.name.split(" ")[0] : null,
+    // Admin replies the author hasn't opened yet.
+    unreadCount: replies.filter((m) => m.sender.role === "ADMIN" && (!t.authorLastReadAt || m.createdAt > t.authorLastReadAt)).length,
     messages: replies.map((m) => ({ ...toMessage(m), aiAssisted: undefined })),
   };
 }

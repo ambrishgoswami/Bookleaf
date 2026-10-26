@@ -24,6 +24,8 @@ interface DemoTicket {
   replies?: { admin: 0 | 1; body: string; ageHours: number }[];
   note?: { admin: 0 | 1; body: string };
   assignee?: 0 | 1;
+  /** CSAT the author gave after resolution. */
+  rating?: number;
 }
 
 const DEMO: DemoTicket[] = [
@@ -53,7 +55,7 @@ const DEMO: DemoTicket[] = [
     note: { admin: 0, body: "Batch printed in-house on the old press. Checking with print floor whether other orders from that run are affected." },
   },
   {
-    author: "AUTH007", book: "BK011", ageHours: 120, status: "RESOLVED", assignee: 1,
+    author: "AUTH007", book: "BK011", ageHours: 120, status: "RESOLVED", assignee: 1, rating: 5,
     subject: "Book unavailable on Flipkart",
     description: "Chai & Chapters is showing 'Currently unavailable' on Flipkart since Monday. It's my best-selling book, please check.",
     replies: [
@@ -80,7 +82,7 @@ const DEMO: DemoTicket[] = [
     description: "I'm interested in the Bestseller Breakthrough package for my next book. What does it include compared to Standard Free, and can I upgrade an existing book?",
   },
   {
-    author: "AUTH001", book: "BK002", ageHours: 400, status: "CLOSED", assignee: 0,
+    author: "AUTH001", book: "BK002", ageHours: 400, status: "CLOSED", assignee: 0, rating: 4,
     subject: "Royalty statement breakdown",
     description: "Could you explain how the royalty for The Saffron Diaries was calculated? I'd like to see the per-platform breakdown.",
     replies: [
@@ -118,6 +120,8 @@ export async function seedDemoTickets(prisma: PrismaClient, adminEmails: string[
         createdAt: hoursAgo(d.ageHours),
         firstResponseAt: replies[0] ? hoursAgo(replies[0].ageHours) : null,
         resolvedAt: resolved && replies.length ? hoursAgo(replies.at(-1)!.ageHours) : null,
+        rating: d.rating ?? null,
+        ratedAt: d.rating ? hoursAgo(Math.max(0, (replies.at(-1)?.ageHours ?? 1) - 1)) : null,
         activities: { create: { actorId: author.userId, action: "created", createdAt: hoursAgo(d.ageHours) } },
         messages: {
           create: [

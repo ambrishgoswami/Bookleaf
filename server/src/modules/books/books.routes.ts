@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parse } from "../../lib/validation.js";
 import { currentUser, requireRole } from "../../middleware/auth.js";
+import { toCsv } from "../../lib/csv.js";
 import * as booksService from "./books.service.js";
 
 const ListQuery = z.object({ authorId: z.string().min(1).optional() });
@@ -49,6 +50,19 @@ export const booksRouter = Router();
 
 booksRouter.get("/", async (req, res) => {
   res.json(await booksService.listBooks(currentUser(req), parse(ListQuery, req.query)));
+});
+
+/** Royalty statement as CSV: authors get their own; admins pass ?authorId. */
+booksRouter.get("/statement.csv", async (req, res) => {
+  const { data, summary } = await booksService.listBooks(currentUser(req), parse(ListQuery, req.query));
+  const csv = toCsv(
+    ["Code", "Title", "ISBN", "Status", "Published", "MRP (INR)", "Royalty per copy (INR)", "Copies sold", "Royalty earned (INR)", "Royalty paid (INR)", "Royalty pending (INR)", "Last payout"],
+    [
+      ...data.map((b) => [b.code, b.title, b.isbn, b.status, b.publicationDate, b.mrp, b.royaltyPerCopy, b.copiesSold, b.royaltyEarned, b.royaltyPaid, b.royaltyPending, b.lastRoyaltyPayoutDate]),
+      ["", "Total", "", "", "", "", "", summary.totalCopiesSold, summary.totalRoyaltyEarned, summary.totalRoyaltyPaid, summary.totalRoyaltyPending, ""],
+    ],
+  );
+  res.set({ "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="royalty-statement-${new Date().toISOString().slice(0, 10)}.csv"` }).send(csv);
 });
 
 /** Valid statuses for the admin book form. */
