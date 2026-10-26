@@ -12,6 +12,8 @@ import { authenticate } from "./middleware/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { booksRouter } from "./modules/books/books.routes.js";
+import { adminsRouter, ticketsRouter } from "./modules/tickets/tickets.routes.js";
+import { eventsRouter } from "./modules/events/events.routes.js";
 
 export function createApp() {
   const app = express();
@@ -31,6 +33,9 @@ export function createApp() {
   const api = express.Router();
   api.use(authenticate);
   api.use("/books", booksRouter);
+  api.use("/tickets", ticketsRouter);
+  api.use("/admins", adminsRouter);
+  api.use("/events", eventsRouter);
   app.use("/api/v1", api);
 
   app.use(notFoundHandler);
