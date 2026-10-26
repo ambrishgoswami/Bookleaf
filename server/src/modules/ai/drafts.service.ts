@@ -59,7 +59,7 @@ export async function getOrCreateDraft(ticketId: string, opts: DraftOptions = {}
     }));
   } catch (err) {
     if (!(err instanceof AiUnavailableError)) throw err;
-    draft = templateDraft(category, ctx.authorFirstName);
+    draft = templateDraft(category, ctx.authorFirstName, ctx.facts);
     source = "TEMPLATE";
     aiError = err.reason;
   }

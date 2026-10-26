@@ -213,6 +213,10 @@ describe("AI drafts", () => {
     setProviders([]);
     const res = await getOrCreateDraft(await newTicket());
     expect(res).toMatchObject({ source: "TEMPLATE", aiError: "not_configured" });
+    // Known facts are filled in, not left as placeholders (Priya: ₹3,570 pending, last payout a year ago).
+    expect(res.body).toContain("₹3,570 pending");
+    expect(res.body).not.toContain("[Add the author's pending amount");
+    expect(res.suggestedActions).toContain("Check the payout file for a missed payout and escalate to finance.");
   });
 
   it("is admin-only over HTTP and supports regenerate with guidance", async () => {

@@ -58,6 +58,17 @@ export interface TicketContext {
   conversation: string;
   /** Internal notes — confidential context for the draft, never to be quoted. */
   internalNotes: string;
+  /** The same key facts in structured form, for the no-AI template drafts. */
+  facts: TemplateFacts;
+}
+
+export interface TemplateFacts {
+  book: { title: string; productionStage: string | null; stageNumber: number | null; totalStages: number; possibleMissedPayout: boolean } | null;
+  totalPending: number;
+  meetsThreshold: boolean;
+  nextPayoutQuarter: string;
+  nextPayoutBy: string;
+  anyPossibleMissedPayout: boolean;
 }
 
 export async function buildTicketContext(ticketId: string, today = new Date()): Promise<TicketContext> {
@@ -112,5 +123,19 @@ export async function buildTicketContext(ticketId: string, today = new Date()): 
     accountFacts,
     conversation,
     internalNotes,
+    facts: {
+      book: ticket.book && {
+        title: ticket.book.title,
+        productionStage: ticket.book.status === PUBLISHED_STATUS ? null : productionStage(ticket.book.status).stage,
+        stageNumber: ticket.book.status === PUBLISHED_STATUS ? null : productionStage(ticket.book.status).index + 1,
+        totalStages: productionStage(ticket.book.status).totalStages,
+        possibleMissedPayout: payoutLooksOverdue(ticket.book, today),
+      },
+      totalPending,
+      meetsThreshold: totalPending >= PAYOUT_THRESHOLD_INR,
+      nextPayoutQuarter: payout.quarter,
+      nextPayoutBy: toISODate(payout.payoutBy)!,
+      anyPossibleMissedPayout: author.books.some((b) => payoutLooksOverdue(b, today)),
+    },
   };
 }
