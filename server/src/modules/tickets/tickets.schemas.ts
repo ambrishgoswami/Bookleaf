@@ -35,6 +35,8 @@ export const ListTicketsQuery = z.object({
   from: isoDate.optional(),
   to: isoDate.optional(),
   q: z.string().trim().max(100).optional(),
+  /** Only active tickets still awaiting a first response past their SLA. */
+  overdue: z.stringbool().optional(),
   sort: z.enum(["urgency", "newest", "oldest", "updated"]).default("urgency"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),

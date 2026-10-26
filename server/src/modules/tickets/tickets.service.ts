@@ -10,7 +10,7 @@ import { prisma } from "../../lib/prisma.js";
 import { publish } from "../../lib/events.js";
 import { Conflict, Forbidden, NotFound, ValidationFailed } from "../../lib/errors.js";
 import type { AuthUser } from "../auth/auth.tokens.js";
-import { CATEGORY_LABELS, PRIORITIES } from "../../domain/taxonomy.js";
+import { CATEGORY_LABELS, DEFAULT_PRIORITY, FIRST_RESPONSE_SLA_HOURS, PRIORITIES } from "../../domain/taxonomy.js";
 import { adminTicketInclude, reference, slaStatus, ticketInclude, toAdminTicket, toAuthorTicket } from "./tickets.dto.js";
 import { triageInBackground } from "./triage.js";
 import type { CreateMessageInput, CreateTicketInput, ListTicketsInput, UpdateTicketInput } from "./tickets.schemas.js";
@@ -93,16 +93,35 @@ function buildWhere(user: AuthUser, q: ListTicketsInput): Prisma.TicketWhereInpu
       ...(Number.isInteger(refNumber) && refNumber > 0 ? [{ number: refNumber }] : []),
     ];
   }
+
+  if (q.overdue) {
+    // Same rule as slaStatus(), expressed as a query: one createdAt cutoff per priority.
+    const cutoff = (hours: number) => new Date(Date.now() - hours * 3_600_000);
+    where.AND = [
+      { status: { in: ACTIVE_STATUSES }, firstResponseAt: null },
+      {
+        OR: [
+          ...PRIORITIES.map((p) => ({ priority: p, createdAt: { lt: cutoff(FIRST_RESPONSE_SLA_HOURS[p]) } })),
+          { priority: null, createdAt: { lt: cutoff(FIRST_RESPONSE_SLA_HOURS[DEFAULT_PRIORITY]) } },
+        ],
+      },
+    ];
+  }
   return where;
 }
 
 /**
  * "urgency" = highest priority first (unclassified tickets surface at the top
- * because they still need a human look), then oldest first within a priority.
+ * because they still need a human look); within a priority, tickets still
+ * awaiting a first response come before ones already answered; then oldest.
  * Postgres orders enums by declaration order: CRITICAL < HIGH < MEDIUM < LOW.
  */
 const ORDER_BY: Record<ListTicketsInput["sort"], Prisma.TicketOrderByWithRelationInput[]> = {
-  urgency: [{ priority: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
+  urgency: [
+    { priority: { sort: "asc", nulls: "first" } },
+    { firstResponseAt: { sort: "asc", nulls: "first" } },
+    { createdAt: "asc" },
+  ],
   newest: [{ createdAt: "desc" }],
   oldest: [{ createdAt: "asc" }],
   updated: [{ updatedAt: "desc" }],

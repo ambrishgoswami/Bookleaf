@@ -203,6 +203,16 @@ describe("admin queue", () => {
     expect(bad.status).toBe(422);
   });
 
+  it("overdue filter returns exactly the tickets the SLA marks overdue", async () => {
+    const [overdue, stats] = await Promise.all([
+      request(app).get("/api/v1/tickets?overdue=true&pageSize=100").set(as(adminToken)),
+      request(app).get("/api/v1/tickets/stats").set(as(adminToken)),
+    ]);
+    expect(overdue.status).toBe(200);
+    expect(overdue.body.data.every((t: { sla: { overdue: boolean } }) => t.sla.overdue)).toBe(true);
+    expect(overdue.body.meta.total).toBe(stats.body.data.active.overdue);
+  });
+
   it("returns dashboard stats to admins only", async () => {
     const res = await request(app).get("/api/v1/tickets/stats").set(as(adminToken));
     expect(res.body.data.active).toHaveProperty("overdue");
