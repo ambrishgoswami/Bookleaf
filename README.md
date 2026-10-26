@@ -4,22 +4,36 @@ A web app for BookLeaf Publishing's author support: authors raise and follow tic
 
 | | |
 |---|---|
-| **Live demo** | _added after deployment (Step 8)_ |
+| **Live demo** | _URL added after the Render deployment (see [Deploying](#deploying-render))_ |
 | **API docs** | `/api/docs` (Swagger UI) — spec in [`server/openapi.yaml`](server/openapi.yaml) |
 | **Write-up** | [`docs/WRITEUP.md`](docs/WRITEUP.md) |
 
-### Demo logins
+## 🔑 Quick login
+
+| Portal | Email | Password |
+|---|---|---|
+| **Admin** (support team) | `admin@bookleaf.com` | `Admin@123` |
+| **Author** | `priya.sharma@email.com` | `Author@123` |
+
+The login page also has one-click buttons for these accounts.
+
+**Try this in 2 minutes:**
+1. Log in as the **author** → *My Books* shows royalties and the next payout date → *New Query* suggests help articles as you type → submit a query.
+2. In a private/incognito window, log in as the **admin** → open the ticket from the *Ticket Queue* → the AI draft is already in the reply box → edit and **Send**.
+3. Back in the author window, the reply appears **without refreshing**, with an unread badge.
+
+### More demo accounts
 
 | Role | Email | Password | Good for |
 |---|---|---|---|
-| Admin | `admin@bookleaf.com` | `Admin@123` | Queue, AI drafts, overrides |
 | Admin | `ops@bookleaf.com` | `Admin@123` | Second agent (assignment) |
-| Author | `priya.sharma@email.com` | `Author@123` | Two live books, pending royalty above threshold |
 | Author | `kavita.deshmukh@email.com` | `Author@123` | Book **in production** + ₹850 pending (**below** ₹1,000 threshold) |
 | Author | `arjun.malhotra@email.com` | `Author@123` | Never paid — has an overdue ticket |
 | Author | `ananya.reddy@email.com` | `Author@123` | No tickets (empty states) |
 
-Every author in the dataset can log in with their email and `Author@123`. The login page has one-click demo buttons. New authors can also **sign up** at `/signup` (they start with no books — BookLeaf adds them once a manuscript is received).
+Every author in the dataset can log in with their email and `Author@123`. New authors can also **sign up** at `/signup`; they start with no books, which BookLeaf adds once a manuscript is received. Admin accounts can't be self-registered.
+
+> Use separate browser profiles (or one incognito window) to be signed in as an author and an admin at the same time — the session token is stored per browser.
 
 ---
 
@@ -34,7 +48,8 @@ Every author in the dataset can log in with their email and `Author@123`. The lo
 - **Royalty statement** — download book-by-book sales and royalties as CSV.
 
 **Both portals**
-- **Profile & password** — edit your details and change your password.
+- **Accounts** — email/password login, author **sign-up**, show/hide password on every password field, profile editing and password change.
+- **Navigation** — back buttons on inner pages (history-aware, with a sensible fallback), section headers, and a live-connection indicator.
 - **Two-theme design system** (shadcn-style semantic tokens, Afacad + Inter, green brand accent): a light console with a collapsible sidebar for the support team, and a dark, glassy portal for authors (fixed top bar with icon navigation, section sub-header, inbox layout).
 - **Mobile-first layout** — drawer navigation on phones, card layouts for the queue and author lists, bottom-sheet dialogs, toasts.
 - Authors can mark a ticket **resolved** themselves; replying later reopens it.
@@ -83,14 +98,24 @@ server/
     lib/             prisma, errors, logger, validation, event bus
     middleware/      authenticate, requireRole, error handler
     modules/
-      auth/  books/  tickets/  events/
-      ai/            llm gateway, prompts, knowledge base, context builder, classifier, drafts, templates
-  tests/             vitest + supertest (95 tests)
+      auth/          login, register, profile, password
+      authors/       admin author management
+      books/         books, royalty statement, payouts
+      tickets/       lifecycle, queue, triage, analytics, export, bulk, read state, CSAT
+      attachments/   uploads (content-checked) and downloads
+      macros/        saved replies
+      help/          help-center search
+      events/        SSE stream
+      ai/            llm gateway, providers/ (Claude, Gemini), prompts, knowledge base,
+                     context builder, classifier, drafts, templates
+  tests/             vitest + supertest (98 tests)
 client/
   src/lib/           api client, auth context, SSE hook, formatting, types
-  src/components/    UI primitives, app shell, message thread
-  src/pages/author/  books, new ticket, tickets
-  src/pages/admin/   dashboard, queue, workspace
+  src/components/    UI primitives, app shell (admin + author layouts), dialogs/toasts,
+                     message thread, attachments, charts
+  src/pages/         login, sign-up, profile
+  src/pages/author/  books, tickets (inbox), new query, help center
+  src/pages/admin/   dashboard + analytics, queue, workspace, authors, saved replies
 ```
 
 ### Key decisions
@@ -153,7 +178,7 @@ All LLM traffic goes through one gateway ([`server/src/modules/ai/llm.ts`](serve
 | Refusal / truncated / schema mismatch | Treated as a failed answer; fallback (doesn't trip the breaker). |
 | Repeated failures | A **circuit breaker per provider** opens for 60 s (5 min for auth errors), so an outage doesn't add a timeout to every request — the next provider is tried directly. |
 | Fallback classification | Keyword rules mirroring the KB escalation rules; marked `Rules` in the UI. |
-| Fallback draft | A KB-based template for the category, pre-filled with the author's name, with `[brackets]` to complete. The UI says why ("AI is rate-limited right now"). |
+| Fallback draft | A KB-based template for the category, filled with what the system knows — author's name, pending royalty and threshold position, next payout date, a possible missed payout, the production stage — leaving only unknowable details in `[brackets]`. The UI says why ("AI is rate-limited right now"). |
 | Admin opinion | An admin override always wins, even over a classification that finishes later. |
 
 Tickets are **always** created, and admins can **always** reply manually.
@@ -235,9 +260,10 @@ Errors are always `{ "error": { "code", "message", "details?" } }`:
 | 401 | Missing or expired token |
 | 403 | Wrong role |
 | 404 | Not found, or not yours |
-| 409 | Ticket closed |
+| 409 | Conflict — ticket closed, email already registered, book with sales history |
 | 422 | Validation failed (per-field details) |
-| 429 | Too many login attempts |
+| 413 | Attachment larger than 5 MB |
+| 429 | Too many login / sign-up attempts |
 | 500 | Generic message only; details stay in the server log |
 
 ---
@@ -252,10 +278,10 @@ docker compose up -d
 
 # 2. API
 cd server
-cp .env.example .env          # set JWT_SECRET; ANTHROPIC_API_KEY is optional
+cp .env.example .env          # set JWT_SECRET; AI keys are optional
 npm install
 npx prisma migrate deploy
-npm run db:seed               # 10 authors, 18 books, 2 admins, 8 demo tickets
+npm run db:seed               # 10 authors, 18 books, 2 admins, 8 demo tickets, 5 saved replies
 npm run dev                   # http://localhost:4000  (docs: /api/docs)
 
 # 3. Web app (new terminal)
@@ -266,8 +292,8 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 | Command (in `server/`) | |
 |---|---|
-| `npm test` | 95 integration + unit tests (needs the seeded DB) |
-| `npm run ai:eval -- --drafts` | Live AI evaluation (needs `ANTHROPIC_API_KEY`) |
+| `npm test` | 98 integration + unit tests (needs the seeded DB) |
+| `npm run ai:eval -- --drafts` | Live AI evaluation (needs an Anthropic or Gemini key) |
 | `npm run typecheck` | TypeScript |
 
 **Environment** (`server/.env`):
@@ -289,11 +315,24 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 ---
 
+## Deploying (Render)
+
+[`render.yaml`](render.yaml) is a Render Blueprint that creates everything in one step: a PostgreSQL database, the API and the static web app.
+
+1. Push this repository to GitHub (private).
+2. In Render: **New → Blueprint** → select the repository.
+3. When prompted, paste `ANTHROPIC_API_KEY` and/or `GEMINI_API_KEY` (both optional). `JWT_SECRET` is generated automatically.
+4. Apply. On start, the API runs migrations and the (idempotent) seed, so the demo data and the logins above work immediately.
+
+Free-plan notes: the API sleeps after 15 minutes idle (the first request then takes ~50 s), and free databases expire after 30 days.
+
+---
+
 ## Testing
 
-95 tests (Vitest + Supertest) against a real Postgres, covering:
+98 tests (Vitest + Supertest) against a real Postgres, covering:
 
-- **Auth:** valid/invalid login, the same message for unknown email and wrong password, malformed JSON, tampered token.
+- **Auth:** valid/invalid login, the same message for unknown email and wrong password, malformed JSON, tampered token; sign-up (weak passwords, duplicates, never creates an admin).
 - **RBAC:** authors can't see, list or widen their scope to other authors' books or tickets; admin-only endpoints.
 - **Ticket lifecycle:** first response, auto-assign, reopen on author reply, closed tickets, validation.
 - **Privacy:** internal notes never reach authors — over REST *or* SSE.
