@@ -1,7 +1,9 @@
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { AlertCircle, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Search, UserCheck, X, XCircle } from "lucide-react";
 import { api } from "../../lib/api";
+import { useToast } from "../../components/feedback";
 import { timeAgo } from "../../lib/format";
 import type { AdminTicketListItem, Paginated } from "../../lib/types";
 import { Button, Card, EmptyState, ErrorState, Input, PageHeader, PriorityBadge, Select, Spinner, STATUS_LABELS, StatusBadge, cx } from "../../components/ui";
@@ -18,6 +20,27 @@ export function QueuePage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const admins = useAdmins();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const bulk = useMutation({
+    mutationFn: (op: { action: "assign_to_me" } | { action: "set_status"; status: "RESOLVED" | "CLOSED" }) =>
+      api<{ data: { updated: number; failed: string[] } }>("/tickets/bulk", { method: "POST", body: { ids: [...selected], ...op } }),
+    onSuccess: ({ data }) => {
+      toast(data.failed.length ? `Updated ${data.updated}; ${data.failed.length} could not be changed` : `Updated ${data.updated} tickets`, data.failed.length ? "error" : "success");
+      setSelected(new Set());
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+    onError: (err) => toast(err.message, "error"),
+  });
 
   const filters = {
     status: params.get("status") ?? ACTIVE,
@@ -137,6 +160,24 @@ export function QueuePage() {
         </div>
       </Card>
 
+      {selected.size > 0 && (
+        <div className="sticky top-16 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-popover px-3 py-2 shadow-md" role="toolbar" aria-label="Bulk actions">
+          <span className="mr-1 text-sm font-medium">{selected.size} selected</span>
+          <Button variant="secondary" className="h-8" loading={bulk.isPending} onClick={() => bulk.mutate({ action: "assign_to_me" })}>
+            <UserCheck className="size-4" aria-hidden /> Assign to me
+          </Button>
+          <Button variant="secondary" className="h-8" disabled={bulk.isPending} onClick={() => bulk.mutate({ action: "set_status", status: "RESOLVED" })}>
+            <CheckCircle2 className="size-4" aria-hidden /> Mark resolved
+          </Button>
+          <Button variant="secondary" className="h-8" disabled={bulk.isPending} onClick={() => bulk.mutate({ action: "set_status", status: "CLOSED" })}>
+            <XCircle className="size-4" aria-hidden /> Close
+          </Button>
+          <Button variant="ghost" className="ml-auto h-8" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
+
       {list.isPending ? (
         <Spinner />
       ) : list.error ? (
@@ -174,6 +215,15 @@ export function QueuePage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/60 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 <tr>
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      className="size-4 cursor-pointer accent-primary"
+                      aria-label="Select all on this page"
+                      checked={list.data.data.length > 0 && list.data.data.every((t) => selected.has(t.id))}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(list.data.data.map((t) => t.id)) : new Set())}
+                    />
+                  </th>
                   <th className="px-4 py-3">Priority</th>
                   <th className="px-4 py-3">Ticket</th>
                   <th className="px-4 py-3">Category</th>
@@ -187,8 +237,11 @@ export function QueuePage() {
                   <tr
                     key={t.id}
                     onClick={() => navigate(`/admin/tickets/${t.id}`)}
-                    className={cx("cursor-pointer hover:bg-muted/60", t.sla.overdue && "bg-red-50/60")}
+                    className={cx("cursor-pointer hover:bg-muted/60", t.sla.overdue && "bg-red-50/60", selected.has(t.id) && "bg-muted")}
                   >
+                    <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" className="size-4 cursor-pointer accent-primary" aria-label={`Select ${t.reference}`} checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
+                    </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-col items-start gap-1">
                         <PriorityBadge priority={t.priority} />

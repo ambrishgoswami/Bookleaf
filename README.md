@@ -28,11 +28,15 @@ Every author in the dataset can log in with their email and `Author@123`. The lo
 **Author portal**
 - **My Books** — every field from the brief (title, ISBN, genre, publication date, status, MRP, copies sold, royalty earned/paid/pending) plus a royalty summary that states the **next payout date** or explains that a balance **below ₹1,000 rolls over**. Books in production show a stage tracker instead of empty sales figures.
 - **Raise a query** — book picker with "General / Account Level", subject, description, and **real file attachments** (up to 5 PDFs/images/Word files, 5 MB each).
-- **My Tickets** — status filters, full conversation, plain-language status explanations. Admin replies appear **live** without a refresh. Replying to a resolved ticket reopens it.
+- **My Tickets** — an inbox: search, status filters, conversation, plain-language status explanations. Admin replies appear **live** without a refresh, with **unread badges** in the nav and on each ticket. Replying to a resolved ticket reopens it.
+- **Rate the help (CSAT)** — once a ticket is resolved, the author gives it 1–5 stars with an optional comment.
+- **Help Center** — 13 articles written from the Knowledge Base, searchable. While an author types a new query, **relevant articles are suggested live**, so many questions are answered without a ticket.
+- **Royalty statement** — download book-by-book sales and royalties as CSV.
 
 **Both portals**
 - **Profile & password** — edit your details and change your password.
-- **Mobile-first layout** — hamburger drawer navigation on phones, user menu on desktop, card layouts for the queue and author lists, bottom-sheet dialogs, toasts.
+- **Two-theme design system** (shadcn-style semantic tokens, Afacad + Inter, green brand accent): a light console with a collapsible sidebar for the support team, and a dark, glassy portal for authors (fixed top bar with icon navigation, section sub-header, inbox layout).
+- **Mobile-first layout** — drawer navigation on phones, card layouts for the queue and author lists, bottom-sheet dialogs, toasts.
 - Authors can mark a ticket **resolved** themselves; replying later reopens it.
 
 **Admin portal**
@@ -40,6 +44,9 @@ Every author in the dataset can log in with their email and `Author@123`. The lo
 - **Queue** — filter by status, priority, category, assignee, date range, search (`BL-1001`, author name, text) and "overdue only". Default sort: priority → **unanswered before answered** → oldest. Overdue tickets are highlighted. Filters live in the URL, so views can be shared.
 - **Workspace** — the **AI draft is pre-filled into an editable reply**; regenerate with optional guidance ("shorter", "mention the re-sync is already triggered"); suggested internal follow-ups; *Send* or *Send & resolve*; internal notes; status / category / priority overrides showing the AI's reasoning; assign to me; author and book facts; activity log.
 - **Authors & books (CRUD)** — search authors; add an author (a one-time password is generated); edit, reset password, deactivate/reactivate. Add, edit and delete books (books with sales can't be deleted), move a book through production stages, and **record royalty payouts**.
+- **Support performance analytics** — 7/30/90-day view: tickets per day, category mix, median first-response and resolution times, SLA breach rate, CSAT, AI override rate, and the share of replies sent from the AI draft. Every chart has hover values and a table view.
+- **Saved replies** — the team's reusable answers (5 seeded from the KB), insertable from any ticket with placeholders ({{authorFirstName}}, {{ticketRef}}, {{bookTitle}}) filled in; the most used rise to the top.
+- **Bulk actions and CSV export** — select tickets to assign or resolve in one go; export the filtered queue.
 - Every category and priority shows **who decided it** — `AI`, `Rules` (fallback) or `Admin` — so the team can see what to double-check and how often the model is overridden.
 
 ---
@@ -78,7 +85,7 @@ server/
     modules/
       auth/  books/  tickets/  events/
       ai/            llm gateway, prompts, knowledge base, context builder, classifier, drafts, templates
-  tests/             vitest + supertest (84 tests)
+  tests/             vitest + supertest (95 tests)
 client/
   src/lib/           api client, auth context, SSE hook, formatting, types
   src/components/    UI primitives, app shell, message thread
@@ -205,6 +212,13 @@ Full interactive reference: **`/api/docs`**. Summary (all under `/api/v1`):
 | `POST /tickets/:id/messages` | author (reply) · admin (reply / internal note, optional status) | Conversation |
 | `POST /tickets/:id/draft` | admin | Cached or fresh AI draft (`regenerate`, `guidance`) |
 | `GET /admins` | admin | Assignable admins |
+| `GET /tickets/unread-count` · `POST /tickets/:id/read` | author | Unread replies · mark read |
+| `POST /tickets/:id/rating` | author (resolved, own) | CSAT 1–5 + comment |
+| `GET /tickets/analytics` | admin | Support performance metrics |
+| `GET /tickets/export.csv` · `GET /books/statement.csv` | admin · author | CSV exports |
+| `POST /tickets/bulk` | admin | Assign to me / set status for up to 100 tickets |
+| `GET`/`POST /macros` · `PATCH`/`DELETE /macros/:id` · `POST /macros/:id/use` | admin | Saved replies |
+| `GET /help/articles` · `GET /help/articles/:slug` | any | Help Center search and articles |
 | `GET /authors` · `POST /authors` | admin | List/search · create (one-time password) |
 | `GET /authors/:id` · `PATCH /authors/:id` | admin | Detail · edit / deactivate |
 | `POST /authors/:id/reset-password` | admin | New one-time password |
@@ -251,7 +265,7 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 | Command (in `server/`) | |
 |---|---|
-| `npm test` | 84 integration + unit tests (needs the seeded DB) |
+| `npm test` | 95 integration + unit tests (needs the seeded DB) |
 | `npm run ai:eval -- --drafts` | Live AI evaluation (needs `ANTHROPIC_API_KEY`) |
 | `npm run typecheck` | TypeScript |
 
@@ -276,7 +290,7 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 ## Testing
 
-84 tests (Vitest + Supertest) against a real Postgres, covering:
+95 tests (Vitest + Supertest) against a real Postgres, covering:
 
 - **Auth:** valid/invalid login, the same message for unknown email and wrong password, malformed JSON, tampered token.
 - **RBAC:** authors can't see, list or widen their scope to other authors' books or tickets; admin-only endpoints.
@@ -284,6 +298,7 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 - **Privacy:** internal notes never reach authors — over REST *or* SSE.
 - **Management:** author create/edit/deactivate (deactivation revokes live sessions), password reset and change, book CRUD rules, atomic payouts that can't overpay.
 - **Attachments:** upload and download permissions, content-sniffing rejects a renamed file, type and 5 MB limits.
+- **Engagement & reporting:** unread counts (internal notes excluded), CSAT rules, analytics shape, CSV escaping (incl. formula injection), bulk updates with partial failure, saved-reply CRUD, help-article ranking.
 - **Real-time delivery:** an author's SSE stream receives replies on their tickets and nothing from other authors.
 - **AI layer** (fake Claude and Gemini clients, no network):
   - success path;

@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { AlertCircle, Bot, Clock, Inbox, UserCheck, UserX } from "lucide-react";
-import { api } from "../../lib/api";
+import { AlertCircle, Bot, Clock, Download, Inbox, UserCheck, UserX } from "lucide-react";
+import { api, apiDownload } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { timeAgo } from "../../lib/format";
-import type { AdminTicketListItem, Paginated, QueueStats, TicketPriority } from "../../lib/types";
-import { Card, EmptyState, ErrorState, PageHeader, PriorityBadge, Spinner, StatusBadge, cx } from "../../components/ui";
+import type { AdminTicketListItem, Analytics, Paginated, QueueStats, TicketPriority } from "../../lib/types";
+import { Button, Card, EmptyState, ErrorState, PageHeader, PriorityBadge, Spinner, StatusBadge, cx } from "../../components/ui";
+import { BarList, ColumnChart } from "../../components/charts";
+import { useToast } from "../../components/feedback";
 import { AiStatusBanner, PRIORITIES, useAiStatus } from "./shared";
 
 interface AiUsage {
@@ -125,7 +128,122 @@ export function DashboardPage() {
           <AiUsageCard />
         </div>
       </div>
+
+      <AnalyticsSection />
     </>
+  );
+}
+
+const RANGES = [7, 30, 90] as const;
+const hours = (h: number | null) => (h == null ? "—" : h < 1 ? `${Math.round(h * 60)}m` : h < 48 ? `${h}h` : `${Math.round(h / 24)}d`);
+const pct = (n: number | null) => (n == null ? "—" : `${n}%`);
+
+function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display text-2xl font-semibold tabular-nums">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+/** Support performance over a selectable window. */
+function AnalyticsSection() {
+  const [days, setDays] = useState<(typeof RANGES)[number]>(30);
+  const analytics = useQuery({ queryKey: ["tickets", "analytics", days], queryFn: () => api<{ data: Analytics }>(`/tickets/analytics?days=${days}`) });
+  const [exporting, setExporting] = useState(false);
+  const toast = useToast();
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      await apiDownload("/tickets/export.csv?status=OPEN,IN_PROGRESS,RESOLVED,CLOSED", `bookleaf-tickets-${new Date().toISOString().slice(0, 10)}.csv`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Export failed", "error");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const a = analytics.data?.data;
+  const draftShare = a && a.ai.repliesSent ? Math.round((a.ai.repliesFromDraft / a.ai.repliesSent) * 100) : null;
+  const shortDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Support performance</h2>
+          <p className="text-sm text-muted-foreground">Tickets created in the last {days} days.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md border border-border p-0.5" role="tablist" aria-label="Time range">
+            {RANGES.map((r) => (
+              <button
+                key={r}
+                role="tab"
+                aria-selected={days === r}
+                onClick={() => setDays(r)}
+                className={cx("rounded px-2.5 py-1 text-sm", days === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                {r}d
+              </button>
+            ))}
+          </div>
+          <Button variant="secondary" onClick={exportCsv} loading={exporting}>
+            <Download className="size-4" aria-hidden /> Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {analytics.isPending ? (
+        <Spinner />
+      ) : analytics.error ? (
+        <ErrorState error={analytics.error} onRetry={analytics.refetch} />
+      ) : (
+        a && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <Kpi label="Tickets created" value={String(a.totals.created)} hint={`${a.totals.resolved} resolved`} />
+              <Kpi label="Median first response" value={hours(a.firstResponseHours.median)} hint={`avg ${hours(a.firstResponseHours.average)}`} />
+              <Kpi label="Median resolution" value={hours(a.resolutionHours.median)} hint={`avg ${hours(a.resolutionHours.average)}`} />
+              <Kpi label="SLA breaches" value={pct(a.sla.breachRate)} hint={`${a.sla.breached} of ${a.sla.eligible}`} />
+              <Kpi label="CSAT" value={a.csat.average == null ? "—" : `${a.csat.average} / 5`} hint={`${a.csat.responses} ratings`} />
+              <Kpi label="Replies from AI draft" value={pct(draftShare)} hint={`AI overrides ${pct(a.ai.overrideRate)}`} />
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3">
+              <Card className="p-5 lg:col-span-2">
+                <h3 className="mb-3 text-base font-semibold">New tickets per day</h3>
+                <ColumnChart caption={`New tickets per day, last ${days} days`} data={a.volume.map((v) => ({ label: shortDate(v.date), tick: shortDate(v.date), value: v.created }))} />
+              </Card>
+              <Card className="p-5">
+                <h3 className="mb-3 text-base font-semibold">Tickets by category</h3>
+                <BarList caption="Tickets by category" data={[...a.byCategory].sort((x, y) => y.count - x.count).map((c) => ({ label: c.label, value: c.count }))} />
+              </Card>
+            </div>
+
+            <Card className="p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-base font-semibold">Author satisfaction</h3>
+                <p className="text-sm text-muted-foreground">
+                  {a.csat.responses ? `${a.csat.average} average from ${a.csat.responses} ratings` : "No ratings yet — authors are asked to rate once a ticket is resolved."}
+                </p>
+              </div>
+              {a.csat.responses > 0 && (
+                <div className="mt-4 max-w-xl">
+                  <BarList
+                    caption="CSAT rating distribution"
+                    data={[...a.csat.distribution].reverse().map((d) => ({ label: `${"★".repeat(d.score)} ${d.score}`, value: d.count }))}
+                  />
+                </div>
+              )}
+            </Card>
+          </div>
+        )
+      )}
+    </section>
   );
 }
 

@@ -11,7 +11,7 @@ import { Button, Card, Field, Input, PageHeader } from "../components/ui";
 export function ProfilePage() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Profile" subtitle="Your account details and password." />
+      <PageHeader title="Account settings" subtitle="Your account details and password." />
       <div className="grid gap-6">
         <DetailsCard />
         <PasswordCard />

@@ -1,16 +1,31 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { CalendarClock, Info, MessageSquarePlus } from "lucide-react";
-import { api } from "../../lib/api";
+import { CalendarClock, Download, Info, MessageSquarePlus } from "lucide-react";
+import { api, apiDownload } from "../../lib/api";
+import { useToast } from "../../components/feedback";
 import { date, inr, number } from "../../lib/format";
 import type { Book, BooksResponse } from "../../lib/types";
-import { Badge, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../components/ui";
 
 export function BooksPage() {
   const { data, isPending, error, refetch } = useQuery({
     queryKey: ["books"],
     queryFn: () => api<BooksResponse>("/books"),
   });
+
+  const toast = useToast();
+  const [downloading, setDownloading] = useState(false);
+  async function downloadStatement() {
+    setDownloading(true);
+    try {
+      await apiDownload("/books/statement.csv", `royalty-statement-${new Date().toISOString().slice(0, 10)}.csv`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Download failed", "error");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   if (isPending) return <Spinner label="Loading your books…" />;
   if (error) return <ErrorState error={error} onRetry={refetch} />;
@@ -19,8 +34,15 @@ export function BooksPage() {
   return (
     <>
       <PageHeader
-        title="My Books"
+        title="Your books & royalties"
         subtitle={`${summary.totalBooks} ${summary.totalBooks === 1 ? "book" : "books"} · ${summary.publishedBooks} published`}
+        action={
+          data.data.length > 0 && (
+            <Button variant="secondary" onClick={downloadStatement} loading={downloading}>
+              <Download className="size-4" aria-hidden /> Royalty statement (CSV)
+            </Button>
+          )
+        }
       />
 
       {data.data.length === 0 ? (

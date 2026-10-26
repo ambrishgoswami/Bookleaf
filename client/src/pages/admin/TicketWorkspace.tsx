@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft, Bot, CheckSquare, Lock, RefreshCw, Send, Sparkles, Wrench } from "lucide-react";
+import { AlertCircle, ArrowLeft, Bot, CheckSquare, Lock, RefreshCw, Send, Sparkles, Star, Wrench } from "lucide-react";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { date, dateTime, inr, timeAgo } from "../../lib/format";
 import type { Activity, AdminTicket, Book, Draft, TicketCategory, TicketPriority, TicketStatus } from "../../lib/types";
 import { MessageThread } from "../../components/MessageThread";
 import { Attachments } from "../../components/Attachments";
+import { useMacros } from "./MacrosPage";
 import { Badge, Button, Card, ErrorState, Input, PriorityBadge, Select, Spinner, STATUS_LABELS, StatusBadge, Textarea, cx } from "../../components/ui";
 import { CATEGORIES, CATEGORY_LABELS, PRIORITIES, SourceTag, STATUSES, useAdmins } from "./shared";
 
@@ -213,6 +214,14 @@ function Composer({ ticket }: { ticket: AdminTicket }) {
 
         {mode === "REPLY" && (
           <div className="flex flex-wrap items-center gap-2">
+            <MacroPicker
+              ticket={ticket}
+              onInsert={(text) => {
+                setBody(text);
+                setTouched(true);
+                setFromDraft(false);
+              }}
+            />
             <Input
               aria-label="Instructions for regenerating the draft"
               placeholder="Optional: steer the AI, e.g. 'shorter' or 'mention re-sync already triggered'"
@@ -366,6 +375,14 @@ function PropertiesCard({ ticket: t, onChange, saving, error }: { ticket: AdminT
           </span>
         )}
       </div>
+      {t.rating != null && (
+        <div className="rounded-lg bg-muted px-3 py-2 text-sm">
+          <p className="flex items-center gap-1.5 font-medium">
+            <Star className="size-4 fill-amber-400 text-amber-400" aria-hidden /> Author rated {t.rating}/5
+          </p>
+          {t.ratingComment && <p className="mt-1 text-muted-foreground">“{t.ratingComment}”</p>}
+        </div>
+      )}
       {error && <p className="text-xs text-red-600">{error.message}</p>}
     </Card>
   );
@@ -449,5 +466,35 @@ function ActivityCard({ activities }: { activities: Activity[] }) {
         ))}
       </ol>
     </Card>
+  );
+}
+
+/** Inserts a saved reply, filling its placeholders from the ticket. Replies for this ticket's category come first. */
+function MacroPicker({ ticket, onInsert }: { ticket: AdminTicket; onInsert: (text: string) => void }) {
+  const macros = useMacros();
+  const list = [...(macros.data?.data ?? [])].sort((a, b) => Number(b.category === ticket.category) - Number(a.category === ticket.category));
+
+  function insert(id: string) {
+    const macro = list.find((m) => m.id === id);
+    if (!macro) return;
+    const filled = macro.body
+      .replaceAll("{{authorFirstName}}", ticket.author.name.split(" ")[0]!)
+      .replaceAll("{{ticketRef}}", ticket.reference)
+      .replaceAll("{{bookTitle}}", ticket.book ? `"${ticket.book.title}"` : "your book");
+    onInsert(filled);
+    void api(`/macros/${id}/use`, { method: "POST" }).catch(() => {}); // usage stats only
+  }
+
+  if (!list.length) return null;
+  return (
+    <Select aria-label="Insert a saved reply" className="w-auto max-w-56" value="" onChange={(e) => insert(e.target.value)}>
+      <option value="">Saved reply…</option>
+      {list.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.category === ticket.category ? "★ " : ""}
+          {m.title}
+        </option>
+      ))}
+    </Select>
   );
 }

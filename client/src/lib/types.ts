@@ -98,6 +98,10 @@ export interface AuthorTicket extends TicketBase {
   resolvedAt: string | null;
   handledBy: string | null;
   messages: Message[];
+  /** Admin replies the author hasn't opened yet (author view). */
+  unreadCount?: number;
+  rating: number | null;
+  ratingComment: string | null;
 }
 
 export interface Sla {
@@ -193,4 +197,38 @@ export interface AuthorDetail extends Omit<AuthorListItem, "bookCount" | "publis
   books: Book[];
   summary: BooksResponse["summary"];
   tickets: { id: string; reference: string; subject: string; status: TicketStatus; priority: TicketPriority | null; createdAt: string }[];
+}
+
+export interface Analytics {
+  periodDays: number;
+  totals: { created: number; resolved: number; open: number };
+  volume: { date: string; created: number; resolved: number }[];
+  byCategory: { category: TicketCategory; label: string; count: number }[];
+  byPriority: { priority: TicketPriority; count: number }[];
+  firstResponseHours: { average: number | null; median: number | null };
+  resolutionHours: { average: number | null; median: number | null };
+  sla: { eligible: number; breached: number; breachRate: number | null };
+  csat: { responses: number; average: number | null; distribution: { score: number; count: number }[] };
+  ai: { classifiedByAi: number; classifiedByRules: number; overriddenByAdmin: number; overrideRate: number | null; repliesSent: number; repliesFromDraft: number };
+}
+
+export interface Macro {
+  id: string;
+  title: string;
+  body: string;
+  category: TicketCategory | null;
+  categoryLabel: string | null;
+  usageCount: number;
+  updatedAt: string;
+  createdBy: { id: string; name: string } | null;
+}
+
+export interface HelpArticle {
+  slug: string;
+  title: string;
+  category: TicketCategory;
+  categoryLabel: string;
+  summary: string;
+  body: string[];
+  keywords: string[];
 }

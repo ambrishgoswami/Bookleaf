@@ -6,10 +6,13 @@
  * (e.g. /profile) render inside the right chrome automatically.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import {
   BookOpen,
   Inbox,
+  LifeBuoy,
+  MessageSquareText,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -21,6 +24,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useTicketEvents, type ConnectionState } from "../lib/realtime";
 import { Button, cx } from "./ui";
@@ -38,12 +42,14 @@ const AUTHOR_NAV: NavItem[] = [
   { to: "/books", label: "My Books", icon: BookOpen },
   { to: "/tickets", label: "My Tickets", icon: Ticket },
   { to: "/new-ticket", label: "New Query", icon: PlusCircle },
+  { to: "/help", label: "Help", icon: LifeBuoy },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/tickets", label: "Ticket Queue", icon: Inbox },
   { to: "/admin/authors", label: "Authors", icon: Users },
+  { to: "/admin/macros", label: "Saved Replies", icon: MessageSquareText },
 ];
 
 const LIVE: Record<ConnectionState, { dot: string; label: string }> = {
@@ -239,6 +245,10 @@ function AuthorShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useDismiss(profileOpen, () => setProfileOpen(false));
+  // Real-time events invalidate ["tickets"], so this stays current without polling.
+  const unreadQuery = useQuery({ queryKey: ["tickets", "unread"], queryFn: () => api<{ data: { messages: number } }>("/tickets/unread-count") });
+  const unread = unreadQuery.data?.data.messages ?? 0;
+  const section = SUB_HEADERS.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
 
   useEffect(() => {
     setMobileOpen(false);
@@ -265,7 +275,10 @@ function AuthorShell() {
                   )
                 }
               >
-                <Icon className="size-[1.3rem]" aria-hidden />
+                <span className="relative">
+                  <Icon className="size-[1.3rem]" aria-hidden />
+                  {to === "/tickets" && unread > 0 && <UnreadDot count={unread} />}
+                </span>
                 <span>{label}</span>
               </NavLink>
             ))}
@@ -338,6 +351,7 @@ function AuthorShell() {
                 }
               >
                 <Icon className="size-5" aria-hidden /> {label}
+                {to === "/tickets" && unread > 0 && <span className="ml-auto rounded-full bg-brand px-1.5 text-xs font-bold text-brand-foreground">{unread}</span>}
               </NavLink>
             ))}
           </nav>
@@ -349,11 +363,37 @@ function AuthorShell() {
         </div>
       </Drawer>
 
-      <main className="mx-auto max-w-7xl px-4 pt-[calc(56px+1.5rem)] pb-10 sm:px-[30px]">
+      <div className="pt-14">{section && <SubHeader label={section} />}</div>
+      <main className="mx-auto max-w-7xl px-4 pt-6 pb-10 sm:px-[30px]">
         <ThemeScope.Provider value="dark">
           <Outlet />
         </ThemeScope.Provider>
       </main>
     </div>
+  );
+}
+
+const SUB_HEADERS: [string, string][] = [
+  ["/books", "My Books"],
+  ["/tickets", "My Tickets"],
+  ["/new-ticket", "Raise a Query"],
+  ["/help", "Help Center"],
+  ["/profile", "Profile"],
+];
+
+/** Full-width section band under the top bar. */
+function SubHeader({ label }: { label: string }) {
+  return (
+    <div className="w-full bg-[#727272] py-1 text-center">
+      <h1 className="font-display text-lg font-bold tracking-widest text-white uppercase">{label}</h1>
+    </div>
+  );
+}
+
+function UnreadDot({ count }: { count: number }) {
+  return (
+    <span className="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-foreground" aria-label={`${count} unread`}>
+      {count > 9 ? "9+" : count}
+    </span>
   );
 }

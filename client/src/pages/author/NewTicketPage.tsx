@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Paperclip, X } from "lucide-react";
+import { Lightbulb, Paperclip, X } from "lucide-react";
 import { api, ApiError, apiUpload } from "../../lib/api";
 import type { AuthorTicket, BooksResponse } from "../../lib/types";
 import { ACCEPTED_FILES, MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, attachmentProblem, formatSize } from "../../components/Attachments";
 import { useToast } from "../../components/feedback";
+import { ArticleCard, useHelpSearch } from "./HelpPage";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
 
 const DESCRIPTION_MIN = 20;
@@ -68,9 +69,10 @@ export function NewTicketPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <PageHeader title="Raise a support query" subtitle="Our team typically replies within one business day — urgent issues much sooner." />
+    <div className="mx-auto max-w-6xl">
+      <PageHeader title="Tell us what you need" subtitle="Our team typically replies within one business day — urgent issues much sooner." />
 
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <Card className="p-6">
         <form onSubmit={submit} className="space-y-5" noValidate>
           <Field
@@ -190,6 +192,42 @@ export function NewTicketPage() {
           </div>
         </form>
       </Card>
+      <Suggestions text={`${subject} ${description}`} />
+      </div>
     </div>
+  );
+}
+
+/**
+ * Live help-article suggestions while the author types — many questions are
+ * answered by policy, so showing it first saves the author a wait and the
+ * team a ticket.
+ */
+function Suggestions({ text }: { text: string }) {
+  const ready = text.trim().length >= 12;
+  const results = useHelpSearch(ready ? text : "", 3);
+  const articles = ready ? (results.data?.data ?? []) : [];
+
+  return (
+    <aside className="rounded-[14px] border border-white/10 bg-[#1e1e1e] p-5 lg:sticky lg:top-24">
+      <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+        <Lightbulb className="size-5 text-brand" aria-hidden /> {articles.length ? "These might answer it" : "Quick answers"}
+      </h2>
+      {!ready ? (
+        <p className="mt-2 text-sm text-muted-foreground">Start describing your question and we'll suggest relevant answers from our help center.</p>
+      ) : articles.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">No quick answer for this one — submit your query and our team will help.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {articles.map((a) => (
+            <ArticleCard key={a.slug} article={a} />
+          ))}
+          <p className="pt-1 text-xs text-muted-foreground">Found your answer? You don't need to submit anything.</p>
+        </div>
+      )}
+      <Link to="/help" className="mt-3 inline-block text-sm font-medium text-brand hover:underline">
+        Browse the help center →
+      </Link>
+    </aside>
   );
 }

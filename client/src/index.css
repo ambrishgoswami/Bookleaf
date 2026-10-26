@@ -78,6 +78,9 @@
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-accent: oklch(0.95 0 0);
   --sidebar-border: oklch(0.922 0 0);
+
+  /* Chart mark colour — validated ≥3:1 against the light surface. */
+  --chart-1: #0e8f52;
 }
 
 /* Author portal: dark, glassy surfaces with the green brand as primary. */
@@ -101,6 +104,7 @@
   --border: #343434;
   --input: #3d3d3d;
   --ring: #00bd65;
+  --chart-1: #00bd65;
 }
 
 @layer base {

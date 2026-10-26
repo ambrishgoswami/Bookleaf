@@ -14,6 +14,8 @@ import { TicketWorkspace } from "./pages/admin/TicketWorkspace";
 import { AuthorsPage } from "./pages/admin/AuthorsPage";
 import { AuthorDetailPage } from "./pages/admin/AuthorDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { MacrosPage } from "./pages/admin/MacrosPage";
+import { HelpPage } from "./pages/author/HelpPage";
 
 /** Client-side route guard. The API enforces the same rules — this is UX, not security. */
 function RequireRole({ role, children }: { role?: Role; children: ReactNode }) {
@@ -40,6 +42,7 @@ export function App() {
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/tickets/:id" element={<TicketsPage />} />
         <Route path="/new-ticket" element={<NewTicketPage />} />
+        <Route path="/help" element={<HelpPage />} />
       </Route>
 
       <Route element={<RequireRole role="ADMIN"><AppShell /></RequireRole>}>
@@ -48,6 +51,7 @@ export function App() {
         <Route path="/admin/tickets/:id" element={<TicketWorkspace />} />
         <Route path="/admin/authors" element={<AuthorsPage />} />
         <Route path="/admin/authors/:id" element={<AuthorDetailPage />} />
+        <Route path="/admin/macros" element={<MacrosPage />} />
       </Route>
 
       <Route element={<RequireRole><AppShell /></RequireRole>}>

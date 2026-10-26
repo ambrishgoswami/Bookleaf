@@ -22,6 +22,8 @@ tags:
   - name: Books
   - name: Tickets
   - name: Authors
+  - name: Saved replies
+  - name: Help
   - name: AI
   - name: Realtime
 
@@ -255,6 +257,51 @@ paths:
                   data: { type: array, items: { oneOf: [{ $ref: "#/components/schemas/AuthorTicket" }, { $ref: "#/components/schemas/AdminTicketListItem" }] } }
                   meta: { $ref: "#/components/schemas/PageMeta" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /tickets/unread-count:
+    get:
+      tags: [Tickets]
+      summary: Unread admin replies across the author's tickets
+      description: "Roles: AUTHOR. Internal notes never count."
+      responses:
+        "200": { description: "`{ data: { messages, tickets } }`" }
+
+  /tickets/analytics:
+    get:
+      tags: [Tickets]
+      summary: Support performance metrics
+      description: |
+        Roles: ADMIN. Daily volume, category/priority mix, first-response and resolution times (avg/median),
+        SLA breach rate, CSAT distribution, AI classification/override rate and share of replies sent from the AI draft.
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 7, maximum: 180, default: 30 } }
+      responses:
+        "200": { description: Analytics }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /tickets/export.csv:
+    get:
+      tags: [Tickets]
+      summary: Export the ticket queue as CSV
+      description: "Roles: ADMIN. Accepts the same filters as GET /tickets (max 5,000 rows). Cells are guarded against spreadsheet formula injection."
+      responses:
+        "200": { description: CSV file, content: { text/csv: {} } }
+
+  /tickets/bulk:
+    post:
+      tags: [Tickets]
+      summary: Bulk assign or change status
+      description: "Roles: ADMIN. Up to 100 tickets; each goes through the normal update (audit log, events). Returns per-ticket failures."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { type: object, required: [ids, action], properties: { ids: { type: array, items: { type: string } }, action: { const: assign_to_me } } }
+                - { type: object, required: [ids, action, status], properties: { ids: { type: array, items: { type: string } }, action: { const: set_status }, status: { $ref: "#/components/schemas/TicketStatus" } } }
+      responses:
+        "200": { description: "`{ data: { updated, failed: string[] } }`" }
 
   /tickets/stats:
     get:
@@ -495,6 +542,16 @@ paths:
       responses:
         "200": { description: List of status strings }
 
+  /books/statement.csv:
+    get:
+      tags: [Books]
+      summary: Royalty statement as CSV
+      description: "Roles: AUTHOR (own books), ADMIN (optional ?authorId)."
+      parameters:
+        - { name: authorId, in: query, schema: { type: string } }
+      responses:
+        "200": { description: CSV file, content: { text/csv: {} } }
+
   /books/{id}/payouts:
     post:
       tags: [Books]
@@ -514,6 +571,35 @@ paths:
       responses:
         "200": { description: Updated book }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /tickets/{id}/read:
+    post:
+      tags: [Tickets]
+      summary: Mark a ticket's replies as read
+      description: "Roles: AUTHOR (own tickets)."
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: Marked read }
+
+  /tickets/{id}/rating:
+    post:
+      tags: [Tickets]
+      summary: Rate a resolved ticket (CSAT)
+      description: "Roles: AUTHOR (own tickets, RESOLVED or CLOSED). Can be changed later."
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: [string, "null"], maxLength: 1000 }
+      responses:
+        "200": { description: Saved rating }
+        "409": { description: Ticket not resolved yet }
 
   /tickets/{id}/attachments:
     post:
@@ -544,6 +630,79 @@ paths:
         - { name: attachmentId, in: path, required: true, schema: { type: string } }
       responses:
         "200": { description: File bytes }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /macros:
+    get:
+      tags: [Saved replies]
+      summary: List saved replies (most used first)
+      description: "Roles: ADMIN"
+      responses:
+        "200": { description: Saved replies }
+    post:
+      tags: [Saved replies]
+      summary: Create a saved reply
+      description: "Roles: ADMIN. Body may use {{authorFirstName}}, {{ticketRef}}, {{bookTitle}}."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body]
+              properties:
+                title: { type: string }
+                body: { type: string }
+                category: { oneOf: [{ $ref: "#/components/schemas/TicketCategory" }, { type: "null" }] }
+      responses:
+        "201": { description: Created }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /macros/{id}:
+    patch:
+      tags: [Saved replies]
+      summary: Update a saved reply
+      description: "Roles: ADMIN"
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { description: Updated }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Saved replies]
+      summary: Delete a saved reply
+      description: "Roles: ADMIN"
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: Deleted }
+
+  /macros/{id}/use:
+    post:
+      tags: [Saved replies]
+      summary: Record that a saved reply was inserted (usage ranking)
+      description: "Roles: ADMIN"
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: Counted }
+
+  /help/articles:
+    get:
+      tags: [Help]
+      summary: Search help-center articles
+      description: "Any signed-in user. Keyword-ranked articles from the Knowledge Base; used for live suggestions while writing a query."
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 20 } }
+      responses:
+        "200": { description: Articles }
+
+  /help/articles/{slug}:
+    get:
+      tags: [Help]
+      summary: One help article
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Article }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /admins:
