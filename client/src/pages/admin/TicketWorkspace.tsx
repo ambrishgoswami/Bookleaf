@@ -7,6 +7,7 @@ import { useAuth } from "../../lib/auth";
 import { date, dateTime, inr, timeAgo } from "../../lib/format";
 import type { Activity, AdminTicket, Book, Draft, TicketCategory, TicketPriority, TicketStatus } from "../../lib/types";
 import { MessageThread } from "../../components/MessageThread";
+import { Attachments } from "../../components/Attachments";
 import { Badge, Button, Card, ErrorState, Input, PriorityBadge, Select, Spinner, STATUS_LABELS, StatusBadge, Textarea, cx } from "../../components/ui";
 import { CATEGORIES, CATEGORY_LABELS, PRIORITIES, SourceTag, STATUSES, useAdmins } from "./shared";
 
@@ -60,6 +61,10 @@ export function TicketWorkspace() {
               original={{ authorName: t.author.name, body: t.description, createdAt: t.createdAt, attachmentName: t.attachmentName }}
               messages={t.messages}
             />
+          </Card>
+
+          <Card className="p-5">
+            <Attachments ticketId={t.id} attachments={t.attachments} canUpload />
           </Card>
 
           <Composer ticket={t} />
@@ -424,6 +429,8 @@ const ACTION_LABELS: Record<string, (a: Activity) => string> = {
   assigned: () => "assigned the ticket",
   unassigned: () => "unassigned the ticket",
   reopened_by_author: () => "reopened the ticket with a reply",
+  resolved_by_author: () => "marked the ticket as resolved",
+  attachment_added: (a) => `attached ${a.toValue}`,
 };
 
 function ActivityCard({ activities }: { activities: Activity[] }) {

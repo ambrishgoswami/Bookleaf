@@ -27,13 +27,19 @@ Every author in the dataset can log in with their email and `Author@123`. The lo
 
 **Author portal**
 - **My Books** — every field from the brief (title, ISBN, genre, publication date, status, MRP, copies sold, royalty earned/paid/pending) plus a royalty summary that states the **next payout date** or explains that a balance **below ₹1,000 rolls over**. Books in production show a stage tracker instead of empty sales figures.
-- **Raise a query** — book picker with "General / Account Level", subject, description, attachment picker (UI only, as allowed by the brief).
+- **Raise a query** — book picker with "General / Account Level", subject, description, and **real file attachments** (up to 5 PDFs/images/Word files, 5 MB each).
 - **My Tickets** — status filters, full conversation, plain-language status explanations. Admin replies appear **live** without a refresh. Replying to a resolved ticket reopens it.
+
+**Both portals**
+- **Profile & password** — edit your details and change your password.
+- **Mobile-first layout** — hamburger drawer navigation on phones, user menu on desktop, card layouts for the queue and author lists, bottom-sheet dialogs, toasts.
+- Authors can mark a ticket **resolved** themselves; replying later reopens it.
 
 **Admin portal**
 - **Dashboard** — active / overdue / unassigned / mine, a "needs attention" list, priority mix, AI health and 30-day AI cost.
 - **Queue** — filter by status, priority, category, assignee, date range, search (`BL-1001`, author name, text) and "overdue only". Default sort: priority → **unanswered before answered** → oldest. Overdue tickets are highlighted. Filters live in the URL, so views can be shared.
 - **Workspace** — the **AI draft is pre-filled into an editable reply**; regenerate with optional guidance ("shorter", "mention the re-sync is already triggered"); suggested internal follow-ups; *Send* or *Send & resolve*; internal notes; status / category / priority overrides showing the AI's reasoning; assign to me; author and book facts; activity log.
+- **Authors & books (CRUD)** — search authors; add an author (a one-time password is generated); edit, reset password, deactivate/reactivate. Add, edit and delete books (books with sales can't be deleted), move a book through production stages, and **record royalty payouts**.
 - Every category and priority shows **who decided it** — `AI`, `Rules` (fallback) or `Admin` — so the team can see what to double-check and how often the model is overridden.
 
 ---
@@ -72,7 +78,7 @@ server/
     modules/
       auth/  books/  tickets/  events/
       ai/            llm gateway, prompts, knowledge base, context builder, classifier, drafts, templates
-  tests/             vitest + supertest (66 tests)
+  tests/             vitest + supertest (84 tests)
 client/
   src/lib/           api client, auth context, SSE hook, formatting, types
   src/components/    UI primitives, app shell, message thread
@@ -184,9 +190,13 @@ Full interactive reference: **`/api/docs`**. Summary (all under `/api/v1`):
 | Method & path | Roles | Purpose |
 |---|---|---|
 | `POST /auth/login` | public | Email + password → JWT (rate-limited) |
-| `GET /auth/me` | any | Current user |
+| `GET /auth/me` · `PATCH /auth/me` | any | Current user · edit own profile |
+| `POST /auth/change-password` | any | Change password (current + strong new) |
 | `GET /books` | author (own) · admin (all, `?authorId=`) | Books + royalty summary |
 | `GET /books/:id` | author (own) · admin | One book |
+| `POST /books` · `PATCH /books/:id` · `DELETE /books/:id` | admin | Book CRUD with business rules |
+| `POST /books/:id/payouts` | admin | Record a royalty payout (atomic) |
+| `GET /books/statuses` | any | Valid production statuses |
 | `POST /tickets` | author | Raise a ticket (201; triage runs in the background) |
 | `GET /tickets` | author (own) · admin (queue) | Filters: `status, category, priority, assignee, from, to, q, overdue, sort, page, pageSize` |
 | `GET /tickets/stats` | admin | Dashboard counts |
@@ -195,6 +205,10 @@ Full interactive reference: **`/api/docs`**. Summary (all under `/api/v1`):
 | `POST /tickets/:id/messages` | author (reply) · admin (reply / internal note, optional status) | Conversation |
 | `POST /tickets/:id/draft` | admin | Cached or fresh AI draft (`regenerate`, `guidance`) |
 | `GET /admins` | admin | Assignable admins |
+| `GET /authors` · `POST /authors` | admin | List/search · create (one-time password) |
+| `GET /authors/:id` · `PATCH /authors/:id` | admin | Detail · edit / deactivate |
+| `POST /authors/:id/reset-password` | admin | New one-time password |
+| `POST /tickets/:id/attachments` · `GET …/attachments/:attachmentId` | owner author · admin | Upload (multipart) · download |
 | `GET /ai/status` · `GET /ai/usage` | admin | AI health, tokens, cost |
 | `GET /events` | any | SSE stream of ticket changes (scoped per role) |
 
@@ -237,7 +251,7 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 | Command (in `server/`) | |
 |---|---|
-| `npm test` | 66 integration + unit tests (needs the seeded DB) |
+| `npm test` | 84 integration + unit tests (needs the seeded DB) |
 | `npm run ai:eval -- --drafts` | Live AI evaluation (needs `ANTHROPIC_API_KEY`) |
 | `npm run typecheck` | TypeScript |
 
@@ -262,12 +276,14 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 
 ## Testing
 
-66 tests (Vitest + Supertest) against a real Postgres, covering:
+84 tests (Vitest + Supertest) against a real Postgres, covering:
 
 - **Auth:** valid/invalid login, the same message for unknown email and wrong password, malformed JSON, tampered token.
 - **RBAC:** authors can't see, list or widen their scope to other authors' books or tickets; admin-only endpoints.
 - **Ticket lifecycle:** first response, auto-assign, reopen on author reply, closed tickets, validation.
 - **Privacy:** internal notes never reach authors — over REST *or* SSE.
+- **Management:** author create/edit/deactivate (deactivation revokes live sessions), password reset and change, book CRUD rules, atomic payouts that can't overpay.
+- **Attachments:** upload and download permissions, content-sniffing rejects a renamed file, type and 5 MB limits.
 - **Real-time delivery:** an author's SSE stream receives replies on their tickets and nothing from other authors.
 - **AI layer** (fake Claude and Gemini clients, no network):
   - success path;
@@ -286,7 +302,7 @@ npm run dev                   # http://localhost:5173  (proxies /api to :4000)
 ## Known limitations & what I'd do next
 
 - **Single API instance for real-time.** The event bus is in-process. With more than one instance, back it with Postgres `LISTEN/NOTIFY` or Redis pub/sub; the interface stays the same.
-- **Attachments are UI-only** (allowed by the brief). Next: S3 pre-signed uploads with type/size checks and virus scanning; image attachments could also be passed to the model for print-quality tickets.
+- **Attachments live in Postgres** (≤5 MB each, type-checked by content). That's simple and private for this scale; at volume they'd move to S3 with signed URLs and virus scanning. Image attachments could also be passed to the model for print-quality tickets.
 - **Token in `localStorage`.** Simple for a demo; production would use an httpOnly, SameSite cookie with CSRF protection, and short-lived access tokens with refresh.
 - **Background work runs in-process.** Triage is fire-and-forget, so a crash mid-classification leaves the ticket "Triaging…" (admins can still set the values). Next: a job queue (pg-boss / BullMQ) with retries, plus a sweep for unclassified tickets.
 - **No email notifications.** Authors see replies live in the portal; production would also email them.

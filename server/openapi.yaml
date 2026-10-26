@@ -21,6 +21,7 @@ tags:
   - name: Auth
   - name: Books
   - name: Tickets
+  - name: Authors
   - name: AI
   - name: Realtime
 
@@ -77,6 +78,25 @@ paths:
           content: { application/json: { schema: { type: object, properties: { user: { $ref: "#/components/schemas/User" } } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+    patch:
+      tags: [Auth]
+      summary: Update own profile
+      description: "Roles: AUTHOR (name, phone, city), ADMIN (name). Email and role are changed by admins only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string }
+                phone: { type: [string, "null"] }
+                city: { type: [string, "null"] }
+      responses:
+        "200": { description: Updated profile }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
   /books:
     get:
       tags: [Books]
@@ -98,6 +118,38 @@ paths:
                   summary: { $ref: "#/components/schemas/RoyaltySummary" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+    post:
+      tags: [Books]
+      summary: Create a book for an author
+      description: |
+        Roles: ADMIN. Gets the next code (e.g. BK019). Published books need publicationDate, mrp and royaltyPerCopy;
+        a book with sales must be Published & Live; paid cannot exceed earned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [authorId, title, isbn, genre, status]
+              properties:
+                title: { type: string }
+                isbn: { type: string }
+                genre: { type: string }
+                status: { type: string, description: "One of GET /books/statuses" }
+                publicationDate: { type: [string, "null"], format: date }
+                mrp: { type: [integer, "null"] }
+                royaltyPerCopy: { type: [integer, "null"] }
+                copiesSold: { type: integer }
+                royaltyEarned: { type: integer }
+                royaltyPaid: { type: integer, description: "royaltyPending is always derived as earned minus paid" }
+                printPartner: { type: [string, "null"] }
+                availableOn: { type: array, items: { type: string } }
+                authorId: { type: string }
+      responses:
+        "201": { description: Created book, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Book" } } } } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
   /books/{id}:
     get:
       tags: [Books]
@@ -107,6 +159,43 @@ paths:
       responses:
         "200": { description: Book, content: { application/json: { schema: { type: object, properties: { data: { $ref: "#/components/schemas/Book" } } } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      tags: [Books]
+      summary: Update a book (only the fields sent)
+      description: "Roles: ADMIN. Same business rules as create, applied to the merged result."
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                title: { type: string }
+                isbn: { type: string }
+                genre: { type: string }
+                status: { type: string, description: "One of GET /books/statuses" }
+                publicationDate: { type: [string, "null"], format: date }
+                mrp: { type: [integer, "null"] }
+                royaltyPerCopy: { type: [integer, "null"] }
+                copiesSold: { type: integer }
+                royaltyEarned: { type: integer }
+                royaltyPaid: { type: integer, description: "royaltyPending is always derived as earned minus paid" }
+                printPartner: { type: [string, "null"] }
+                availableOn: { type: array, items: { type: string } }
+      responses:
+        "200": { description: Updated book }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      tags: [Books]
+      summary: Delete a book without sales history
+      description: "Roles: ADMIN. Books with copies sold or royalty earned return 409, because royalty records must be kept."
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "204": { description: Deleted }
+        "409": { description: Book has sales history }
 
   /tickets:
     post:
@@ -199,7 +288,7 @@ paths:
       tags: [Tickets]
       summary: Update status, override category/priority, or assign
       description: |
-        Roles: ADMIN. Category/priority set here are recorded with source `ADMIN` and are never overwritten by a late AI result.
+        Roles: ADMIN (any field). AUTHOR: only `{ "status": "RESOLVED" }` on their own open ticket. Category/priority set here are recorded with source `ADMIN` and are never overwritten by a late AI result.
         Every change is written to the activity log.
       parameters: [{ $ref: "#/components/parameters/Id" }]
       requestBody:
@@ -299,6 +388,163 @@ paths:
                     - { operation: classify, model: claude-haiku-5-5, calls: 42, cacheHitRatio: 0.71, avgLatencyMs: 1450, estimatedCostUsd: 0.0061 }
                   failures: { rate_limited: 1 }
                   classificationSources: { AI: 39, FALLBACK: 1, ADMIN: 2 }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change own password
+      description: "Roles: AUTHOR, ADMIN. New password: 8+ characters with a letter and a number. Rate-limited."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        "204": { description: Password changed }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /authors:
+    get:
+      tags: [Authors]
+      summary: List authors with stats
+      description: "Roles: ADMIN"
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: "Name, email, city, code or book title" }
+        - { name: status, in: query, schema: { type: string, enum: [all, active, inactive], default: all } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 25, maximum: 100 } }
+      responses:
+        "200": { description: Page of authors (bookCount, publishedCount, totalRoyaltyPending, activeTickets, isActive) }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Authors]
+      summary: Create an author account
+      description: |
+        Roles: ADMIN. Creates the login and author profile with the next code (e.g. AUTH011).
+        If `password` is omitted, a one-time password is generated and returned **once** as `temporaryPassword`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                phone: { type: [string, "null"] }
+                city: { type: [string, "null"] }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201": { description: "Created — `{ data: AuthorDetail, temporaryPassword: string | null }`" }
+        "409": { description: Email already in use, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /authors/{id}:
+    get:
+      tags: [Authors]
+      summary: Author profile with books, royalty summary and recent tickets
+      description: "Roles: ADMIN"
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { description: Author detail }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Authors]
+      summary: Edit an author, or deactivate / reactivate them
+      description: |
+        Roles: ADMIN. Accounts are never deleted (ticket and royalty history must be kept). `isActive: false` blocks
+        login and revokes existing sessions immediately.
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                phone: { type: [string, "null"] }
+                city: { type: [string, "null"] }
+                isActive: { type: boolean }
+      responses:
+        "200": { description: Updated author }
+        "409": { description: Email already in use }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /authors/{id}/reset-password:
+    post:
+      tags: [Authors]
+      summary: Reset an author's password
+      description: "Roles: ADMIN. Returns a new one-time password; the old one stops working."
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { description: "`{ temporaryPassword }`" }
+
+  /books/statuses:
+    get:
+      tags: [Books]
+      summary: Valid book statuses (one per production stage + Published & Live)
+      responses:
+        "200": { description: List of status strings }
+
+  /books/{id}/payouts:
+    post:
+      tags: [Books]
+      summary: Record a royalty payout
+      description: "Roles: ADMIN. Moves `amount` from pending to paid atomically and sets the last payout date. Can't exceed pending."
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: integer, minimum: 1 }
+                date: { type: string, format: date }
+      responses:
+        "200": { description: Updated book }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /tickets/{id}/attachments:
+    post:
+      tags: [Tickets]
+      summary: Upload a file to a ticket
+      description: |
+        Roles: AUTHOR (own, not closed), ADMIN. `multipart/form-data` with one `file` field. PDF, PNG, JPEG, WEBP or DOCX,
+        ≤5 MB, ≤5 files per ticket. The content is checked against its declared type (magic bytes).
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } }
+      responses:
+        "201": { description: Attachment metadata }
+        "409": { description: Ticket closed or attachment limit reached }
+        "413": { description: File larger than 5 MB }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /tickets/{id}/attachments/{attachmentId}:
+    get:
+      tags: [Tickets]
+      summary: Download an attachment
+      description: "Roles: AUTHOR (own tickets), ADMIN. Always served as a download (`Content-Disposition: attachment`), never cached."
+      parameters:
+        - { $ref: "#/components/parameters/Id" }
+        - { name: attachmentId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: File bytes }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /admins:
     get:

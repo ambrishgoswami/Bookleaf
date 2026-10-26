@@ -145,7 +145,32 @@ export function QueuePage() {
         <EmptyState title="No tickets match these filters" body={hasFilters ? "Try widening the filters." : "The queue is empty."} />
       ) : (
         <Card className={cx("overflow-hidden", list.isPlaceholderData && "opacity-60")}>
-          <div className="overflow-x-auto">
+          {/* Phones: one card per ticket */}
+          <ul className="divide-y divide-slate-100 md:hidden">
+            {list.data.data.map((t) => (
+              <li key={t.id}>
+                <Link to={`/admin/tickets/${t.id}`} className={cx("block px-4 py-3", t.sla.overdue && "bg-red-50/60")}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <PriorityBadge priority={t.priority} />
+                    <StatusBadge status={t.status} />
+                    {t.sla.overdue && (
+                      <span className="flex items-center gap-1 text-xs font-medium text-red-600">
+                        <AlertCircle className="size-3" aria-hidden /> Overdue
+                      </span>
+                    )}
+                    <span className="ml-auto text-xs text-slate-500">{timeAgo(t.createdAt)}</span>
+                  </div>
+                  <p className="mt-1.5 font-medium text-slate-900">{t.subject}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {t.reference} · {t.author.name} · {t.categoryLabel ?? "Classifying…"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">{t.assignee ? `Assigned to ${t.assignee.name}` : "Unassigned"}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs font-medium tracking-wide text-slate-500 uppercase">
                 <tr>

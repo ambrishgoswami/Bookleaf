@@ -7,6 +7,8 @@ import { useAuth } from "../../lib/auth";
 import { timeAgo } from "../../lib/format";
 import type { AuthorTicket, Paginated, TicketStatus } from "../../lib/types";
 import { MessageThread } from "../../components/MessageThread";
+import { Attachments } from "../../components/Attachments";
+import { ConfirmDialog, useToast } from "../../components/feedback";
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatusBadge, Textarea, cx } from "../../components/ui";
 
 const FILTERS: { label: string; value: TicketStatus | "" }[] = [
@@ -135,6 +137,19 @@ function TicketDetail({ id }: { id: string }) {
     },
   });
 
+  const toast = useToast();
+  const [confirmResolve, setConfirmResolve] = useState(false);
+  const resolve = useMutation({
+    mutationFn: () => api(`/tickets/${id}`, { method: "PATCH", body: { status: "RESOLVED" } }),
+    onSuccess: () => {
+      setConfirmResolve(false);
+      toast("Glad we could help! Ticket marked as resolved.");
+      queryClient.invalidateQueries({ queryKey: ["ticket", id] });
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+    onError: (err) => toast(err.message, "error"),
+  });
+
   if (ticket.isPending) return <Spinner />;
   if (ticket.error) return <ErrorState error={ticket.error} onRetry={ticket.refetch} />;
   const t = ticket.data.data;
@@ -173,9 +188,13 @@ function TicketDetail({ id }: { id: string }) {
       <div className="p-5">
         <MessageThread
           viewer="AUTHOR"
-          original={{ authorName: user?.name ?? "You", body: t.description, createdAt: t.createdAt, attachmentName: t.attachmentName }}
+          original={{ authorName: user?.name ?? "You", body: t.description, createdAt: t.createdAt, attachmentName: t.attachments.length ? null : t.attachmentName }}
           messages={t.messages}
         />
+      </div>
+
+      <div className="border-t border-slate-100 p-5">
+        <Attachments ticketId={t.id} attachments={t.attachments} canUpload={t.status !== "CLOSED"} />
       </div>
 
       {t.status !== "CLOSED" && (
@@ -191,13 +210,30 @@ function TicketDetail({ id }: { id: string }) {
             onChange={(e) => setReply(e.target.value)}
           />
           {send.error && <p className="mt-2 text-sm text-red-600">{send.error.message}</p>}
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {t.status === "OPEN" || t.status === "IN_PROGRESS" ? (
+              <Button type="button" variant="ghost" onClick={() => setConfirmResolve(true)}>
+                <CheckCircle2 className="size-4" aria-hidden /> My issue is resolved
+              </Button>
+            ) : (
+              <span />
+            )}
             <Button type="submit" loading={send.isPending} disabled={!reply.trim()}>
               Send reply
             </Button>
           </div>
         </form>
       )}
+
+      <ConfirmDialog
+        open={confirmResolve}
+        title="Mark this ticket as resolved?"
+        body="We'll close the loop on our side. If anything comes up later, just reply here and the ticket will reopen."
+        confirmLabel="Yes, it's resolved"
+        loading={resolve.isPending}
+        onConfirm={() => resolve.mutate()}
+        onCancel={() => setConfirmResolve(false)}
+      />
     </Card>
   );
 }

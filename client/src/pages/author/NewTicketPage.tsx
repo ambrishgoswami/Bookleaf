@@ -2,17 +2,18 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Paperclip, X } from "lucide-react";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, apiUpload } from "../../lib/api";
 import type { AuthorTicket, BooksResponse } from "../../lib/types";
+import { ACCEPTED_FILES, MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, attachmentProblem, formatSize } from "../../components/Attachments";
+import { useToast } from "../../components/feedback";
 import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
 
-const MAX_ATTACHMENT_MB = 10;
-const ACCEPTED = ".pdf,.jpg,.jpeg,.png,.docx";
 const DESCRIPTION_MIN = 20;
 const DESCRIPTION_MAX = 5000;
 
 export function NewTicketPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const books = useQuery({ queryKey: ["books"], queryFn: () => api<BooksResponse>("/books") });
@@ -20,32 +21,45 @@ export function NewTicketPage() {
   const [bookId, setBookId] = useState(params.get("book") ?? "");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string>();
 
+  // Create the ticket first, then upload files to it. If an upload fails, the
+  // ticket still exists — the author is told and can re-attach from the ticket.
   const create = useMutation({
-    mutationFn: () =>
-      api<{ data: AuthorTicket }>("/tickets", {
+    mutationFn: async () => {
+      const { data } = await api<{ data: AuthorTicket }>("/tickets", {
         method: "POST",
-        body: { bookId: bookId || null, subject, description, attachmentName: attachment?.name ?? null },
-      }),
-    onSuccess: ({ data }) => {
+        body: { bookId: bookId || null, subject, description },
+      });
+      const failed: string[] = [];
+      for (const file of files) {
+        try {
+          await apiUpload(`/tickets/${data.id}/attachments`, file);
+        } catch {
+          failed.push(file.name);
+        }
+      }
+      return { ticket: data, failed };
+    },
+    onSuccess: ({ ticket, failed }) => {
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
-      navigate(`/tickets/${data.id}`, { state: { created: data.reference } });
+      if (failed.length) toast(`Ticket created, but ${failed.join(", ")} couldn't be uploaded. You can attach it from the ticket.`, "error");
+      navigate(`/tickets/${ticket.id}`, { state: { created: ticket.reference } });
     },
   });
 
   const fieldErrors = create.error instanceof ApiError ? create.error.fieldErrors() : {};
   const selectedBook = books.data?.data.find((b) => b.id === bookId);
 
-  function pickFile(file: File | undefined) {
+  function pickFiles(list: FileList | null) {
     setAttachmentError(undefined);
-    if (!file) return;
-    if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
-      setAttachmentError(`Files must be under ${MAX_ATTACHMENT_MB} MB.`);
-      return;
-    }
-    setAttachment(file);
+    if (!list?.length) return;
+    const picked = Array.from(list);
+    const problem = picked.map(attachmentProblem).find(Boolean);
+    if (problem) return setAttachmentError(problem);
+    if (files.length + picked.length > MAX_ATTACHMENTS) return setAttachmentError(`You can attach up to ${MAX_ATTACHMENTS} files.`);
+    setFiles((f) => [...f, ...picked]);
   }
 
   function submit(e: FormEvent) {
@@ -113,24 +127,49 @@ export function NewTicketPage() {
             />
           </Field>
 
-          <Field label="Attachment (optional)" htmlFor="attachment" error={attachmentError} hint={`PDF, image or Word document, up to ${MAX_ATTACHMENT_MB} MB.`}>
-            {attachment ? (
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <span className="flex items-center gap-2 truncate">
-                  <Paperclip className="size-4 text-slate-400" aria-hidden />
-                  {attachment.name} <span className="text-slate-400">({(attachment.size / 1024).toFixed(0)} KB)</span>
-                </span>
-                <button type="button" onClick={() => setAttachment(null)} className="rounded p-1 text-slate-500 hover:bg-slate-200" aria-label="Remove attachment">
-                  <X className="size-4" />
-                </button>
-              </div>
-            ) : (
+          <Field
+            label="Attachments (optional)"
+            htmlFor="attachment"
+            error={attachmentError}
+            hint={`Screenshots, photos of print defects or PDFs — up to ${MAX_ATTACHMENTS} files, ${MAX_ATTACHMENT_MB} MB each.`}
+          >
+            {files.length > 0 && (
+              <ul className="mb-2 space-y-1.5">
+                {files.map((file, i) => (
+                  <li key={`${file.name}-${i}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Paperclip className="size-4 shrink-0 text-slate-400" aria-hidden />
+                      <span className="truncate">{file.name}</span> <span className="shrink-0 text-slate-400">({formatSize(file.size)})</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFiles((f) => f.filter((_, j) => j !== i))}
+                      className="rounded p-1 text-slate-500 hover:bg-slate-200"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {files.length < MAX_ATTACHMENTS && (
               <label
                 htmlFor="attachment"
                 className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500 hover:border-brand-500 hover:text-brand-700"
               >
-                <Paperclip className="size-4" aria-hidden /> Choose a file
-                <input id="attachment" type="file" accept={ACCEPTED} className="sr-only" onChange={(e) => pickFile(e.target.files?.[0])} />
+                <Paperclip className="size-4" aria-hidden /> {files.length ? "Add another file" : "Choose files"}
+                <input
+                  id="attachment"
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_FILES}
+                  className="sr-only"
+                  onChange={(e) => {
+                    pickFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
               </label>
             )}
           </Field>

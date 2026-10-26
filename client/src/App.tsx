@@ -11,13 +11,16 @@ import { TicketsPage } from "./pages/author/TicketsPage";
 import { DashboardPage } from "./pages/admin/DashboardPage";
 import { QueuePage } from "./pages/admin/QueuePage";
 import { TicketWorkspace } from "./pages/admin/TicketWorkspace";
+import { AuthorsPage } from "./pages/admin/AuthorsPage";
+import { AuthorDetailPage } from "./pages/admin/AuthorDetailPage";
+import { ProfilePage } from "./pages/ProfilePage";
 
 /** Client-side route guard. The API enforces the same rules — this is UX, not security. */
-function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
+function RequireRole({ role, children }: { role?: Role; children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner label="Restoring your session…" />;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to={homeFor(user.role)} replace />;
+  if (role && user.role !== role) return <Navigate to={homeFor(user.role)} replace />;
   return children;
 }
 
@@ -43,6 +46,12 @@ export function App() {
         <Route path="/admin" element={<DashboardPage />} />
         <Route path="/admin/tickets" element={<QueuePage />} />
         <Route path="/admin/tickets/:id" element={<TicketWorkspace />} />
+        <Route path="/admin/authors" element={<AuthorsPage />} />
+        <Route path="/admin/authors/:id" element={<AuthorDetailPage />} />
+      </Route>
+
+      <Route element={<RequireRole><AppShell /></RequireRole>}>
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="*" element={<HomeRedirect />} />

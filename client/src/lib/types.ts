@@ -17,7 +17,7 @@ export interface User {
   email: string;
   name: string;
   role: Role;
-  author: { id: string; code: string; city: string | null; joinedDate: string } | null;
+  author: { id: string; code: string; city: string | null; phone: string | null; joinedDate: string } | null;
 }
 
 export interface Book {
@@ -81,9 +81,19 @@ interface TicketBase {
   updatedAt: string;
 }
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  uploadedBy: UserBrief;
+}
+
 export interface AuthorTicket extends TicketBase {
   description: string;
   attachmentName: string | null;
+  attachments: Attachment[];
   book: { id: string; code: string; title: string; status: string } | null;
   resolvedAt: string | null;
   handledBy: string | null;
@@ -157,7 +167,30 @@ export interface QueueStats {
 
 export interface AiStatus {
   configured: boolean;
-  model: string;
   available: boolean;
-  circuitOpenUntil: string | null;
+  /** The model that will answer the next call (first provider whose circuit is closed). */
+  model: string | null;
+  providers: { name: string; model: string; available: boolean; circuitOpenUntil: string | null }[];
+}
+
+export interface AuthorListItem {
+  id: string;
+  code: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  city: string | null;
+  joinedDate: string;
+  isActive: boolean;
+  bookCount: number;
+  publishedCount: number;
+  totalRoyaltyPending: number;
+  activeTickets: number;
+}
+
+export interface AuthorDetail extends Omit<AuthorListItem, "bookCount" | "publishedCount" | "totalRoyaltyPending" | "activeTickets"> {
+  userId: string;
+  books: Book[];
+  summary: BooksResponse["summary"];
+  tickets: { id: string; reference: string; subject: string; status: TicketStatus; priority: TicketPriority | null; createdAt: string }[];
 }
