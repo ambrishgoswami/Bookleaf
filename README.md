@@ -4,8 +4,8 @@ A web app for BookLeaf Publishing's author support: authors raise and follow tic
 
 | | |
 |---|---|
-| **Live demo** | _URL added after the Render deployment (see [Deploying](#deploying-render))_ |
-| **API docs** | `/api/docs` (Swagger UI) — spec in [`server/openapi.yaml`](server/openapi.yaml) |
+| **Live demo** | https://bookleaf-web-owhj.onrender.com — API: https://bookleaf-api-54mb.onrender.com (free tier: first request after idle can take ~1 min) |
+| **API docs** | [`/api/docs`](https://bookleaf-api-54mb.onrender.com/api/docs) (Swagger UI) — spec in [`server/openapi.yaml`](server/openapi.yaml) |
 | **Write-up** | [`docs/WRITEUP.md`](docs/WRITEUP.md) |
 
 ## 🔑 Quick login
