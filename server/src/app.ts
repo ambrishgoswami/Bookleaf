@@ -15,6 +15,7 @@ import { booksRouter } from "./modules/books/books.routes.js";
 import { adminsRouter, ticketsRouter } from "./modules/tickets/tickets.routes.js";
 import { eventsRouter } from "./modules/events/events.routes.js";
 import { aiRouter, draftRouter } from "./modules/ai/ai.routes.js";
+import { docsRouter } from "./docs.js";
 
 export function createApp() {
   const app = express();
@@ -28,6 +29,7 @@ export function createApp() {
   app.get("/api/v1/health", (_req, res) => res.json({ status: "ok" }));
 
   // Public
+  app.use("/api/docs", docsRouter);
   app.use("/api/v1/auth", authRouter);
 
   // Everything below requires a valid token.
