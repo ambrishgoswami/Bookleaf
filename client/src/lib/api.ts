@@ -3,8 +3,12 @@
  * ApiError, and signals the auth layer when a session has expired.
  */
 
-/** Same-origin in dev (Vite proxy); set VITE_API_URL when the API is on another host. */
-export const API_BASE = `${import.meta.env.VITE_API_URL ?? ""}/api/v1`;
+/**
+ * Same-origin in dev (Vite proxy); set VITE_API_URL when the API is on another
+ * host. A bare host (as Render's blueprint provides) is treated as https.
+ */
+const apiOrigin = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+export const API_BASE = `${apiOrigin && !/^https?:\/\//.test(apiOrigin) ? `https://${apiOrigin}` : apiOrigin}/api/v1`;
 
 const TOKEN_KEY = "bookleaf.token";
 

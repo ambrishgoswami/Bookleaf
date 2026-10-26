@@ -39,7 +39,11 @@ export const env = {
   ...parsed.data,
   GEMINI_API_KEY: parsed.data.GEMINI_API_KEY ?? parsed.data.GOOGLE_API_KEY,
   aiProviders: parsed.data.AI_PROVIDERS.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean),
-  corsOrigins: parsed.data.CORS_ORIGIN.split(",").map((o) => o.trim()),
+  // A bare host (as Render's blueprint provides) is treated as https.
+  corsOrigins: parsed.data.CORS_ORIGIN.split(",")
+    .map((o) => o.trim().replace(/\/$/, ""))
+    .filter(Boolean)
+    .map((o) => (/^https?:\/\//.test(o) ? o : `https://${o}`)),
   isProduction: parsed.data.NODE_ENV === "production",
   isTest: parsed.data.NODE_ENV === "test",
 };
