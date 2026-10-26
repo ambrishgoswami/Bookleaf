@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { seedDemoTickets } from "./demoTickets.js";
 
 const prisma = new PrismaClient();
 
@@ -122,6 +123,8 @@ async function main() {
 
   const [users, books] = await Promise.all([prisma.user.count(), prisma.book.count()]);
   console.log(`Seed complete: ${users} users (${authors.length} authors, ${ADMINS.length} admins), ${books} books.`);
+
+  await seedDemoTickets(prisma, ADMINS.map((a) => a.email));
 }
 
 main()

@@ -9,6 +9,7 @@ import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import { publish } from "../../lib/events.js";
 import { classifyWithRules, type Classification } from "../ai/fallbackClassifier.js";
+import { AiUnavailableError } from "../ai/llm.js";
 
 /** Pluggable so the AI classifier can be swapped in (and stubbed in tests). */
 export type Classifier = (ticketId: string) => Promise<Classification | null>;
@@ -30,7 +31,9 @@ export async function triageTicket(ticketId: string): Promise<void> {
   try {
     result = aiClassifier ? await aiClassifier(ticketId) : null;
   } catch (err) {
-    logger.warn({ err, ticketId }, "AI classification failed — using rule-based fallback");
+    // Provider failures are already logged in detail by the LLM gateway.
+    if (err instanceof AiUnavailableError) logger.info({ ticketId, reason: err.reason }, "Using rule-based fallback");
+    else logger.error({ err, ticketId }, "AI classification crashed — using rule-based fallback");
   }
   if (!result) {
     result = classifyWithRules(ticket.subject, ticket.description);

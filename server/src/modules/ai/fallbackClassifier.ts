@@ -39,7 +39,8 @@ const HIGH_PATTERNS = [
   /isbn.*(wrong|different|duplicate|incorrect|mismatch)|(wrong|different|duplicate|incorrect).*isbn/,
   /(haven'?t|not|never)\s+(received|got).*(royalt|payment|payout)/,
   /blur|misalign|defect|binding|unreadable/,
-  /urgent|asap|immediately|launch|event/,
+  /urgent|asap|immediately/,
+  /(never|not a single|haven'?t (got|received) any).*(royalt|payment|rupee)/,
 ];
 
 const LOW_PATTERNS = [/can i (update|change)/, /how (do|can) i/, /\bbio\b/, /just (wanted|curious)/, /question about/];
