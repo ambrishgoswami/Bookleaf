@@ -1,12 +1,13 @@
-# Render Blueprint — creates the database, API and web app in one step.
-# Render dashboard → New → Blueprint → select this repo. You'll be prompted for
-# the AI keys (both optional; without them the app runs on rule-based fallbacks).
-
-databases:
-  - name: bookleaf-db
-    plan: free
-    databaseName: bookleaf
-    user: bookleaf
+# Render Blueprint — creates the API and web app in one step.
+# Render dashboard → New → Blueprint → select this repo. You'll be prompted for:
+#   DATABASE_URL       PostgreSQL connection string (e.g. a free Neon database;
+#                      use the direct, non-pooled URL with sslmode=require)
+#   ANTHROPIC_API_KEY  optional
+#   GEMINI_API_KEY     optional — without AI keys the app runs on rule-based fallbacks
+#
+# The database is external because Render allows one free Postgres per
+# workspace. To use a Render-managed database instead, add a `databases:`
+# entry and set DATABASE_URL with `fromDatabase`.
 
 services:
   - type: web
@@ -26,9 +27,7 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: DATABASE_URL
-        fromDatabase:
-          name: bookleaf-db
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
