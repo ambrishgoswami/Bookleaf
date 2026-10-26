@@ -28,7 +28,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Payment is made within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard.",
       "Your My Books page shows your pending royalty and the date the next payout is due.",
     ],
-    keywords: ["royalty", "royalties", "payment", "paid", "payout", "when", "received", "money", "quarter", "late"],
+    keywords: ["royalty", "royalties", "payment", "paid", "payout", "received", "money", "quarter", "late"],
   },
   {
     slug: "how-royalty-is-calculated",
@@ -118,7 +118,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Most orders are printed at our in-house facility in Delhi; overflow and special formats go to our partners Repro India and Epitome Books.",
       "Standard turnaround is 5–7 business days from order confirmation.",
     ],
-    keywords: ["print", "printing", "how long", "turnaround", "order", "author copies", "delivery", "days"],
+    keywords: ["print", "printing", "turnaround", "order", "author copies", "delivery"],
   },
   {
     slug: "book-unavailable",
@@ -140,7 +140,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Books are listed on Amazon India, Flipkart, Amazon US, Amazon UK and the BookLeaf Store.",
       "New listings typically go live within 7–10 business days after publication is complete.",
     ],
-    keywords: ["live", "available", "listing", "platforms", "amazon", "flipkart", "store", "when", "new"],
+    keywords: ["go live", "available to buy", "listing", "platforms", "new listing", "store", "published"],
   },
   {
     slug: "production-stages",
@@ -152,7 +152,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "You're emailed at each stage, and My Books shows where your book is right now.",
       "The most common delays are at Cover Design (waiting for your approval) and Proofreading (revision rounds) — replying quickly keeps things moving.",
     ],
-    keywords: ["production", "stage", "status", "typesetting", "proofreading", "cover", "design", "editing", "delay", "how long", "when"],
+    keywords: ["production", "stage", "status", "typesetting", "proofreading", "cover", "design", "editing", "delay", "manuscript"],
   },
   {
     slug: "publishing-packages",
@@ -167,6 +167,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
 ];
 
+/** Question words that appear in many titles and say nothing about the topic. */
+const STOP_WORDS = new Set(["when", "will", "what", "how", "why", "can", "the", "and", "for", "you", "your", "does", "who", "where", "after", "are", "with", "this", "that", "have", "has", "not", "get"]);
+
 const tokenize = (text: string) => text.toLowerCase().match(/[a-z0-9₹,']+/g) ?? [];
 
 /** Ranks articles against free text. Empty query → all articles. */
@@ -178,8 +181,8 @@ export function searchArticles(query: string, limit = 5) {
   return HELP_ARTICLES.map((a) => {
     let score = 0;
     for (const k of a.keywords) if (k.includes(" ") ? q.includes(k) : words.has(k)) score += 3;
-    for (const w of tokenize(a.title)) if (words.has(w)) score += 2;
-    for (const w of tokenize(a.summary)) if (words.has(w)) score += 1;
+    for (const w of tokenize(a.title)) if (words.has(w) && !STOP_WORDS.has(w)) score += 2;
+    for (const w of tokenize(a.summary)) if (words.has(w) && !STOP_WORDS.has(w)) score += 1;
     return { article: a, score };
   })
     .filter((r) => r.score >= 3)
