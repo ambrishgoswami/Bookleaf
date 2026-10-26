@@ -5,7 +5,7 @@ import { api, ApiError } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import type { Macro, TicketCategory } from "../../lib/types";
 import { ConfirmDialog, Modal, useToast } from "../../components/feedback";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../../components/ui";
+import { BackButton, Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Spinner, Textarea } from "../../components/ui";
 import { CATEGORIES, CATEGORY_LABELS } from "./shared";
 
 export const PLACEHOLDERS = ["{{authorFirstName}}", "{{ticketRef}}", "{{bookTitle}}"];
@@ -33,6 +33,7 @@ export function MacrosPage() {
 
   return (
     <>
+      <BackButton fallback="/admin" />
       <PageHeader
         title="Saved replies"
         subtitle="Reusable answers for common questions. Insert them from any ticket — placeholders fill in automatically."

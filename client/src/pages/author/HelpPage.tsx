@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Headset, LifeBuoy, Search } from "lucide-react";
 import { api } from "../../lib/api";
 import type { HelpArticle, TicketCategory } from "../../lib/types";
-import { Button, EmptyState, Spinner, cx } from "../../components/ui";
+import { BackButton, Button, EmptyState, Spinner, cx } from "../../components/ui";
 
 export function useHelpSearch(query: string, limit = 20) {
   const [debounced, setDebounced] = useState(query);
@@ -64,6 +64,7 @@ export function HelpPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <BackButton fallback="/books" />
       <div className="mb-6 text-center">
         <span className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-brand/10 text-brand">
           <LifeBuoy className="size-7" aria-hidden />

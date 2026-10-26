@@ -6,7 +6,7 @@ import { api } from "../../lib/api";
 import { useToast } from "../../components/feedback";
 import { timeAgo } from "../../lib/format";
 import type { AdminTicketListItem, Paginated } from "../../lib/types";
-import { Button, Card, EmptyState, ErrorState, Input, PageHeader, PriorityBadge, Select, Spinner, STATUS_LABELS, StatusBadge, cx } from "../../components/ui";
+import { BackButton, Button, Card, EmptyState, ErrorState, Input, PageHeader, PriorityBadge, Select, Spinner, STATUS_LABELS, StatusBadge, cx } from "../../components/ui";
 import { AiStatusBanner, CATEGORIES, CATEGORY_LABELS, PRIORITIES, SourceTag, STATUSES, useAdmins } from "./shared";
 
 const ACTIVE = "OPEN,IN_PROGRESS";
@@ -79,6 +79,7 @@ export function QueuePage() {
 
   return (
     <>
+      <BackButton fallback="/admin" />
       <PageHeader title="Ticket queue" subtitle="Most urgent first: highest priority, unanswered before answered, then oldest. Overdue tickets are flagged in red." />
       <AiStatusBanner />
 

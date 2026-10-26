@@ -19,7 +19,7 @@ A web app for BookLeaf Publishing's author support: authors raise and follow tic
 | Author | `arjun.malhotra@email.com` | `Author@123` | Never paid — has an overdue ticket |
 | Author | `ananya.reddy@email.com` | `Author@123` | No tickets (empty states) |
 
-Every author in the dataset can log in with their email and `Author@123`. The login page has one-click demo buttons.
+Every author in the dataset can log in with their email and `Author@123`. The login page has one-click demo buttons. New authors can also **sign up** at `/signup` (they start with no books — BookLeaf adds them once a manuscript is received).
 
 ---
 
@@ -197,6 +197,7 @@ Full interactive reference: **`/api/docs`**. Summary (all under `/api/v1`):
 | Method & path | Roles | Purpose |
 |---|---|---|
 | `POST /auth/login` | public | Email + password → JWT (rate-limited) |
+| `POST /auth/register` | public | Author self-registration (never admin) → JWT |
 | `GET /auth/me` · `PATCH /auth/me` | any | Current user · edit own profile |
 | `POST /auth/change-password` | any | Change password (current + strong new) |
 | `GET /books` | author (own) · admin (all, `?authorId=`) | Books + royalty summary |

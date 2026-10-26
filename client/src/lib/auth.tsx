@@ -8,9 +8,19 @@ interface AuthState {
   /** True while restoring a session from a stored token on first load. */
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  /** Author self-registration; signs the new author in. */
+  register: (input: RegisterInput) => Promise<User>;
   logout: () => void;
   /** Replace the cached profile after the user edits it. */
   updateUser: (user: User) => void;
+}
+
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  city?: string;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -44,7 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user;
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, logout, updateUser: setUser }), [user, loading, login, logout]);
+  const register = useCallback(async (input: RegisterInput) => {
+    const res = await api<{ token: string; user: User }>("/auth/register", { method: "POST", body: input });
+    tokenStore.set(res.token);
+    setUser(res.user);
+    return res.user;
+  }, []);
+
+  const value = useMemo(() => ({ user, loading, login, register, logout, updateUser: setUser }), [user, loading, login, register, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

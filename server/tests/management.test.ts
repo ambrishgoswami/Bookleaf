@@ -235,3 +235,33 @@ describe("attachments", () => {
     expect(tooBig.status).toBe(413);
   });
 });
+
+describe("author self-registration", () => {
+  it("creates an author account with no books and signs them in", async () => {
+    const email = uniqueEmail();
+    createdUserEmails.push(email);
+    const res = await request(app).post("/api/v1/auth/register").send({ name: "New Writer", email, password: "Writer123", city: "Jaipur" });
+    expect(res.status).toBe(201);
+    expect(res.body.token).toEqual(expect.any(String));
+    expect(res.body.user).toMatchObject({ role: "AUTHOR", name: "New Writer", author: { code: expect.stringMatching(/^AUTH\d{3}$/), city: "Jaipur" } });
+
+    const books = await request(app).get("/api/v1/books").set(as(res.body.token));
+    expect(books.body.data).toEqual([]);
+  });
+
+  it("rejects weak passwords, bad emails and duplicates", async () => {
+    const weak = await request(app).post("/api/v1/auth/register").send({ name: "X Y", email: uniqueEmail(), password: "short" });
+    expect(weak.status).toBe(422);
+    const bad = await request(app).post("/api/v1/auth/register").send({ name: "X Y", email: "nope", password: "Writer123" });
+    expect(bad.status).toBe(422);
+    const dup = await request(app).post("/api/v1/auth/register").send({ name: "X Y", email: "priya.sharma@email.com", password: "Writer123" });
+    expect(dup.status).toBe(409);
+  });
+
+  it("can never create an admin", async () => {
+    const email = uniqueEmail();
+    createdUserEmails.push(email);
+    const res = await request(app).post("/api/v1/auth/register").send({ name: "Sneaky", email, password: "Writer123", role: "ADMIN" });
+    expect(res.body.user.role).toBe("AUTHOR");
+  });
+});

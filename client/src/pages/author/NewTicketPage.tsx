@@ -7,7 +7,7 @@ import type { AuthorTicket, BooksResponse } from "../../lib/types";
 import { ACCEPTED_FILES, MAX_ATTACHMENTS, MAX_ATTACHMENT_MB, attachmentProblem, formatSize } from "../../components/Attachments";
 import { useToast } from "../../components/feedback";
 import { ArticleCard, useHelpSearch } from "./HelpPage";
-import { Button, Card, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
+import { BackButton, Button, Card, Field, Input, PageHeader, Select, Textarea } from "../../components/ui";
 
 const DESCRIPTION_MIN = 20;
 const DESCRIPTION_MAX = 5000;
@@ -70,6 +70,7 @@ export function NewTicketPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
+      <BackButton fallback="/tickets" />
       <PageHeader title="Tell us what you need" subtitle="Our team typically replies within one business day — urgent issues much sooner." />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

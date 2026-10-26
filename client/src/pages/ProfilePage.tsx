@@ -6,11 +6,13 @@ import { useAuth } from "../lib/auth";
 import { date } from "../lib/format";
 import type { User } from "../lib/types";
 import { useToast } from "../components/feedback";
-import { Button, Card, Field, Input, PageHeader } from "../components/ui";
+import { BackButton, Button, Card, Field, Input, PageHeader, PasswordInput } from "../components/ui";
 
 export function ProfilePage() {
+  const { user } = useAuth();
   return (
     <div className="mx-auto max-w-3xl">
+      <BackButton fallback={user?.role === "ADMIN" ? "/admin" : "/books"} />
       <PageHeader title="Account settings" subtitle="Your account details and password." />
       <div className="grid gap-6">
         <DetailsCard />
@@ -112,14 +114,14 @@ function PasswordCard() {
       </h2>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <Field label="Current password" htmlFor="current" error={errors.currentPassword}>
-          <Input id="current" type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrent(e.target.value)} />
+          <PasswordInput id="current" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrent(e.target.value)} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="New password" htmlFor="new" error={errors.newPassword} hint="At least 8 characters, with a letter and a number.">
-            <Input id="new" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNew(e.target.value)} />
+            <PasswordInput id="new" autoComplete="new-password" value={newPassword} onChange={(e) => setNew(e.target.value)} />
           </Field>
           <Field label="Confirm new password" htmlFor="confirm" error={mismatch ? "Passwords don't match" : undefined}>
-            <Input id="confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <PasswordInput id="confirm" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </Field>
         </div>
         {change.error && !Object.keys(errors).length && <p className="text-sm text-red-600">{change.error.message}</p>}

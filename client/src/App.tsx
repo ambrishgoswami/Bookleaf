@@ -5,6 +5,7 @@ import type { Role } from "./lib/types";
 import { AppShell } from "./components/AppShell";
 import { Spinner } from "./components/ui";
 import { LoginPage, homeFor } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
 import { BooksPage } from "./pages/author/BooksPage";
 import { NewTicketPage } from "./pages/author/NewTicketPage";
 import { TicketsPage } from "./pages/author/TicketsPage";
@@ -36,6 +37,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
 
       <Route element={<RequireRole role="AUTHOR"><AppShell /></RequireRole>}>
         <Route path="/books" element={<BooksPage />} />

@@ -2,8 +2,9 @@
  * Shared UI primitives (shadcn-style, semantic tokens only). They render
  * correctly in both the light admin theme and the dark author theme.
  */
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
-import { AlertTriangle, Inbox, Loader2 } from "lucide-react";
+import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useNavigate } from "react-router";
+import { AlertTriangle, ArrowLeft, Eye, EyeOff, Inbox, Loader2 } from "lucide-react";
 import type { TicketPriority, TicketStatus } from "../lib/types";
 
 export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(" ");
@@ -162,3 +163,48 @@ export const Textarea = ({ className, ...props }: TextareaHTMLAttributes<HTMLTex
 export const Select = ({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) => (
   <select className={cx(control, "h-9 cursor-pointer [&>option]:bg-popover [&>option]:text-popover-foreground", className)} {...props} />
 );
+
+// ---------------------------------------------------------------------------
+// Password field with show/hide
+// ---------------------------------------------------------------------------
+
+export function PasswordInput({ className, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input type={visible ? "text" : "password"} className={cx(control, "h-9 pr-10", className)} {...props} />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+        aria-label={visible ? "Hide password" : "Show password"}
+        aria-pressed={visible}
+        title={visible ? "Hide password" : "Show password"}
+      >
+        {visible ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Back navigation
+// ---------------------------------------------------------------------------
+
+/**
+ * Goes back in history when there is somewhere to go back to inside the app;
+ * otherwise (deep link, new tab) goes to `fallback`.
+ */
+export function BackButton({ fallback, label = "Back", className }: { fallback: string; label?: string; className?: string }) {
+  const navigate = useNavigate();
+  const canGoBack = typeof window !== "undefined" && (window.history.state?.idx ?? 0) > 0;
+  return (
+    <button
+      type="button"
+      onClick={() => (canGoBack ? navigate(-1) : navigate(fallback))}
+      className={cx("mb-4 inline-flex items-center gap-1 rounded-md py-1 pr-2 text-sm text-muted-foreground transition-colors hover:text-foreground", className)}
+    >
+      <ArrowLeft className="size-4" aria-hidden /> {label}
+    </button>
+  );
+}

@@ -6,7 +6,7 @@ import { api } from "../../lib/api";
 import { inr } from "../../lib/format";
 import type { AuthorListItem, Paginated } from "../../lib/types";
 import { useToast } from "../../components/feedback";
-import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Spinner, cx } from "../../components/ui";
+import { BackButton, Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Spinner, cx } from "../../components/ui";
 import { AuthorFormModal, PasswordRevealModal } from "./authorForms";
 
 const STATUS_TABS = [
@@ -40,6 +40,7 @@ export function AuthorsPage() {
 
   return (
     <>
+      <BackButton fallback="/admin" />
       <PageHeader
         title="Authors"
         subtitle="Manage author accounts, their books and royalty payouts."

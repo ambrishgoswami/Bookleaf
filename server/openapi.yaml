@@ -69,6 +69,32 @@ paths:
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { description: Too many login attempts, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
 
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Author self-registration
+      description: |
+        Public. Creates an AUTHOR account (never an admin) with the next author code and no books yet — books are added by
+        BookLeaf once a manuscript is received. Returns a token, like login. Rate-limited with login.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, description: "8+ characters with a letter and a number" }
+                phone: { type: [string, "null"] }
+                city: { type: [string, "null"] }
+      responses:
+        "201": { description: "Registered and signed in — same shape as POST /auth/login" }
+        "409": { description: Email already registered }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
   /auth/me:
     get:
       tags: [Auth]

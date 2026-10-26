@@ -100,6 +100,9 @@ afterEach(() => {
   setAiClassifier(null);
 });
 afterAll(async () => {
+  // Fake-provider calls must not pollute the usage/cost report: remove their
+  // logs while they are still linked to the test tickets.
+  await prisma.aiCallLog.deleteMany({ where: { ticketId: { in: created } } });
   await prisma.ticket.deleteMany({ where: { id: { in: created } } });
 });
 

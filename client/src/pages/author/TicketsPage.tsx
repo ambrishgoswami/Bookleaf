@@ -216,7 +216,7 @@ function TicketDetail({ id }: { id: string }) {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1e1e1e]">
       <div className="border-b border-[#2a2a2a] p-5">
-        <Link to="/tickets" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground lg:hidden">
+        <Link to="/tickets" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden /> All tickets
         </Link>
         {justCreated === t.reference && (

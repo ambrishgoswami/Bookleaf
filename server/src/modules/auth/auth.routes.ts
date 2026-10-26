@@ -5,13 +5,14 @@ import { env } from "../../config/env.js";
 import { parse } from "../../lib/validation.js";
 import { authenticate, currentUser } from "../../middleware/auth.js";
 import * as authService from "./auth.service.js";
+import { createAuthor } from "../authors/authors.service.js";
 
 const LoginBody = z.object({
   email: z.email("Enter a valid email address").trim(),
   password: z.string().min(1, "Password is required").max(200),
 });
 
-// Brute-force protection on the only unauthenticated write endpoint.
+// Brute-force protection for the public login and registration endpoints.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: env.isTest ? 1000 : 20,
@@ -67,4 +68,23 @@ authRouter.post("/change-password", authenticate, loginLimiter, async (req, res)
   const { currentPassword, newPassword } = parse(ChangePasswordBody, req.body);
   await authService.changePassword(currentUser(req).id, currentPassword, newPassword);
   res.status(204).end();
+});
+
+const RegisterBody = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
+  email: z.email("Enter a valid email address").trim(),
+  password: PasswordSchema,
+  phone: z.string().trim().max(30).nullish().transform((v) => v || null),
+  city: z.string().trim().max(80).nullish().transform((v) => v || null),
+});
+
+/**
+ * Author self-registration. Creates an author account (no books yet — books
+ * are added by BookLeaf once a manuscript is received) and signs them in.
+ * Admin accounts are never self-registered. Rate-limited like login.
+ */
+authRouter.post("/register", loginLimiter, async (req, res) => {
+  const input = parse(RegisterBody, req.body);
+  await createAuthor(input);
+  res.status(201).json(await authService.login(input.email, input.password));
 });
